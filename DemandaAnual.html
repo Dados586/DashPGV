@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Sistema Integrado: Sazonalidade & Gráfico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+  <style>
+    :root{
+      /* Cores */
+      --turq-1:#0fdad7; --turq-2:#0aaeb2; --turq-3:#078e94;
+      --panel:#ffffff; --soft:#f3fbfb; --border:#bfe9ea; --border-2:#a7dfe1;
+      --text:#0a2340; --text-2:#12345a; --muted:#315a92;
+
+      /* Cores de Status */
+      --prod-color: #1565C0; 
+      --loss-color: #C62828; --loss-light: #FFEBEE;
+      --dist-color: #00838F; --dist-light: #E0F7FA;
+      --highlight-bg: #FFF59D;
+
+      --grad-real: linear-gradient(90deg, #13c4c2, #0ea5a7);
+      --grad-apar: linear-gradient(90deg, #5fd3f4, #2fa0e3);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      background:linear-gradient(160deg, var(--turq-1), var(--turq-2), var(--turq-3));
+      color:var(--text); padding:20px; min-height: 100vh;
+    }
+
+    header{ display:flex; align-items:center; gap:12px; margin-bottom:20px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    header h1{ margin:0; font-size:1.8rem; }
+    .badge{ padding:4px 10px; border-radius:99px; background:rgba(255,255,255,0.2); font-size:0.9rem; border:1px solid rgba(255,255,255,0.4); }
+
+    .container{ max-width: 1500px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    
+    .card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; box-shadow:0 8px 18px rgba(0,0,0,.08); }
+    .card h2{ margin:0 0 15px 0; font-size:1.2rem; color:var(--text-2); border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+
+    /* Importador */
+    .upload-box { border: 2px dashed var(--border-2); background: var(--soft); padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.3s; margin-bottom: 15px; }
+    .upload-box:hover { background: #e0f7fa; border-color: var(--turq-2); }
+    
+    #mappingArea { background: #FFFDE7; border: 2px solid #FFD54F; padding: 15px; border-radius: 8px; margin-top: 15px; display: none; }
+    .mapping-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .dist-group { background: #E0F7FA; padding: 10px; border-radius: 8px; grid-column: span 2; border: 1px solid #B2EBF2; }
+    .dist-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; color: var(--text-2); }
+    select, input { width: 100%; padding: 10px; border: 1px solid var(--border-2); border-radius: 8px; background: #fff; color: var(--text); }
+    
+    button.btn-calc { width: 100%; padding: 12px; background: linear-gradient(90deg, var(--turq-2), var(--turq-3)); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+    button.btn-calc:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* Tabela de Resultados */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { background: var(--text-2); color: white; padding: 10px; text-align: center; white-space: nowrap; }
+    td { padding: 8px; border-bottom: 1px solid #eee; text-align: center; }
+    tr:hover td { background: var(--soft); }
+    tr.selected-row td { background-color: var(--highlight-bg) !important; border-top: 2px solid #FBC02D; border-bottom: 2px solid #FBC02D; }
+
+    /* Cores das Colunas */
+    .th-prod { background: var(--prod-color); }
+    .th-dist { background: var(--dist-color); }
+    .th-loss { background: var(--loss-color); }
+    .bg-dist { background: var(--dist-light); color: var(--dist-color); font-weight: bold; }
+    .bg-loss { background: var(--loss-light); color: var(--loss-color); font-weight: bold; }
+
+    /* Layout Calculadora */
+    .split-layout { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; }
+    @media (max-width: 900px) { .split-layout { grid-template-columns: 1fr; } }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .result-box { background: var(--soft); border: 1px solid var(--border); padding: 15px; border-radius: 10px; margin-top: 15px; }
+    .stat { background: #fff; border: 1px solid var(--border-2); padding: 10px; border-radius: 8px; text-align: center; }
+    .stat .val { font-size: 1.2rem; font-weight: bold; color: var(--turq-3); }
+    .stat .lbl { font-size: 0.8rem; color: var(--muted); }
+
+    .bar { height: 12px; background: #ddd; border-radius: 6px; overflow: hidden; margin: 15px 0; display: flex; }
+    .bar-real { background: var(--grad-real); height: 100%; transition: width 0.3s; }
+    .bar-apar { background: var(--grad-apar); height: 100%; transition: width 0.3s; }
+
+    .btn { background: var(--soft); border: 1px solid var(--border-2); padding: 8px 15px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-weight: 600; }
+    .btn:hover { background: #d9fbfc; }
+    .btn.accent { background: var(--turq-2); color: white; border: none; }
+    .btn.danger { background: #ffecec; color: #b71c1c; border-color: #ffcdd2; }
+    
+    /* Área do Gráfico */
+    .chart-container { position: relative; height: 350px; width: 100%; background: #fff; border-radius: 8px; padding: 10px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Sistema Integrado: Sazonalidade & Gráfico de Perdas</h1>
+  <div class="badge">Engenharia Hídrica</div>
+</header>
+
+<div class="container">
+
+  <section class="card">
+    <h2>1. Análise de Sazonalidade (Excel)</h2>
+    
+    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+      <div style="flex: 1;">
+        <label>Nome do Sistema / Cidade:</label>
+        <input type="text" id="cityInput" placeholder="Ex: Tucunduva - Zona Norte">
+      </div>
+    </div>
+
+    <div class="upload-box">
+      <p style="margin:0;"><b>Clique ou Arraste sua planilha Excel aqui</b><br><small>(O sistema lê a Linha 3 como cabeçalho)</small></p>
+      <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none;">
+    </div>
+    
+    <div id="mappingArea">
+      <h3 style="margin-top:0; color:#F57F17; font-size: 1rem;">🛠️ Mapeamento de Colunas</h3>
+      <div class="mapping-grid">
+        <div><label>Data:</label><select id="mapDate"></select></div>
+        <div><label>Produção:</label><select id="mapProd"></select></div>
+        <div class="dist-group">
+          <label style="color: #006064; margin-bottom: 5px;">Distribuição (Soma):</label>
+          <div class="dist-inputs">
+            <div><label>Micro:</label><select id="mapDist1"></select></div>
+            <div><label>Macro/Est:</label><select id="mapDist2"></select></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-calc" onclick="processarDadosIniciais()">✅ Processar Dados</button>
+    </div>
+
+    <div id="resultsArea" style="display:none; margin-top: 20px;">
+      <div style="background: #E1F5FE; padding: 15px; border-radius: 8px; border: 1px solid #B3E5FC; margin-bottom: 15px;">
+        <label style="color: #01579B; margin-bottom: 5px;">📅 Selecione o Mês de Referência (Base = 1.0):</label>
+        <select id="refSelect" onchange="atualizarReferencia()" style="border: 2px solid #0288D1; font-weight: bold; color: #01579B;">
+          <option value="-1">★ Média Geral (Padrão)</option>
+        </select>
+        <p style="font-size: 0.85rem; color: #555; margin: 5px 0 0 0;">
+          * Ao selecionar, os dados são enviados para a calculadora e o gráfico abaixo.
+        </p>
+      </div>
+
+      <div style="text-align: right; margin-bottom: 10px;">
+        <button class="btn" onclick="exportCSV()">⬇ Baixar CSV Completo</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="resultTable">
+          <thead>
+            <tr>
+              <th rowspan="2">Data</th>
+              <th rowspan="2">Dias</th>
+              <th rowspan="2" class="th-prod">Produção<br>(m³)</th>
+              <th colspan="3" class="th-dist">Distribuição (Demanda)</th>
+              <th colspan="4" class="th-loss">Perdas (Prod - Dist)</th>
+            </tr>
+            <tr>
+              <th class="th-dist">Vol (m³)</th>
+              <th class="th-dist">Vazão (m³/dia)</th>
+              <th class="th-dist">K (Dist)</th>
+              <th class="th-loss">Vol (m³)</th>
+              <th class="th-loss">% Perdas</th>
+              <th class="th-loss">Vazão (m³/dia)</th>
+              <th class="th-loss">K (Perda)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="split-layout">
+    
+    <section class="card" id="calcCard">
+      <h2>2. Calculadora de Perdas (Fina)</h2>
+      
+      <div class="row">
+        <div>
+          <label>Setor / Zona</label>
+          <input type="text" id="setor" placeholder="Ex: DMA Centro">
+        </div>
+        <div>
+          <label>Unidade de Exibição</label>
+          <select id="unit" onchange="recalc()">
+            <option value="m3d" selected>m³/dia</option>
+            <option value="m3h">m³/h</option>
+            <option value="ls">L/s</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Micromedido (Distribuído)</label>
+          <input type="number" id="qMic" step="0.01" oninput="recalc()">
+        </div>
+        <div>
+          <label>% de Perdas (IPD)</label>
+          <input type="number" id="pLoss" step="0.01" oninput="recalc()">
+        </div>
+      </div>
+
+      <div class="result-box">
+        <div class="result-grid">
+          <div class="stat">
+            <div class="lbl">SIV (Calculado)</div>
+            <div class="val" id="sivOut">—</div>
+          </div>
+          <div class="stat">
+            <div class="lbl">Volume de Perdas</div>
+            <div class="val" id="lossOut">—</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:20px; font-size:1rem; color:var(--text-2)">Divisão: Reais vs Aparentes</h3>
+      <div class="row">
+        <div>
+          <label>% Reais</label>
+          <input type="number" id="pReal" value="70" oninput="recalc()">
+        </div>
+        <div>
+          <label>% Aparentes</label>
+          <input type="number" id="pApar" value="30" oninput="recalc()">
+        </div>
+      </div>
+
+      <div class="bar">
+        <div id="barReal" class="bar-real" style="width:70%"></div>
+        <div id="barApar" class="bar-apar" style="width:30%"></div>
+      </div>
+
+      <div class="result-grid">
+        <div class="stat">
+          <div class="lbl">Perdas Reais</div>
+          <div class="val" id="lossReal">—</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">Perdas Aparentes</div>
+          <div class="val" id="lossApar">—</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; text-align:right;">
+        <button class="btn accent" id="saveBtn" onclick="saveRecord()" disabled>💾 Adicionar ao Gráfico Manualmente</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h2>3. Histórico de IPD (% Perdas)</h2>
+        <div>
+          <button class="btn" onclick="exportMemorial()">⬇ CSV</button>
+          <button class="btn danger" onclick="clearMemorial()">🧹 Limpar</button>
+        </div>
+      </div>
+      
+      <div class="chart-container">
+        <canvas id="memorialChart"></canvas>
+      </div>
+      <p style="font-size:0.8rem; color:#666; text-align:center; margin-top:5px;">
+        * O gráfico exibe os valores de Perda (%) em cada ponto.
+      </p>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // ==========================================
+  // LÓGICA DE IMPORTAÇÃO (SOFTWARE A)
+  // ==========================================
+  let rawRows = [];
+  let processedData = []; 
+  const HEADER_ROW_IDX = 2; // Linha 3
+
+  const uploadBox = document.querySelector('.upload-box');
+  const fileInput = document.getElementById('fileInput');
+  uploadBox.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', handleFile);
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rawRows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ""});
+      initMapping();
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function initMapping() {
+    if(rawRows.length <= HEADER_ROW_IDX) { alert("Planilha muito curta."); return; }
+    const headers = rawRows[HEADER_ROW_IDX];
+    const selectors = [
+      document.getElementById('mapDate'), document.getElementById('mapProd'),
+      document.getElementById('mapDist1'), document.getElementById('mapDist2')
+    ];
+    selectors.forEach(s => s.innerHTML = "");
+    headers.forEach((h, idx) => {
+      const label = `Col ${String.fromCharCode(65 + idx)}: ${h}`;
+      const opt = new Option(label, idx);
+      selectors.forEach(s => s.add(opt.cloneNode(true)));
+    });
+
+    selectByKeyword(document.getElementById('mapDate'), headers, ['data', 'date']);
+    selectByKeyword(document.getElementById('mapProd'), headers, ['prod', 'macro', 'capt']);
+    
+    // --- LÓGICA DE SHIFT +1 NA COLUNA ---
+    const idxDist1 = findIdx(headers, ['micro', 'mciro', 'dist', 'vol. dis']);
+    if (idxDist1 !== -1) {
+      // Se achou na coluna F (idx 5), seleciona G (idx 6) para o Micro
+      if(idxDist1 + 1 < headers.length) {
+          document.getElementById('mapDist1').value = idxDist1 + 1;
+      }
+      // Macro vai para H (idx 7)
+      if(idxDist1 + 2 < headers.length) {
+          document.getElementById('mapDist2').value = idxDist1 + 2;
+      }
+    }
+    document.getElementById('mappingArea').style.display = 'block';
+  }
+
+  function findIdx(headers, keywords) {
+    return headers.findIndex(h => {
+      const txt = String(h).toLowerCase();
+      return keywords.some(k => txt.includes(k));
+    });
+  }
+  function selectByKeyword(selectInfo, headers, keywords) {
+    const idx = findIdx(headers, keywords);
+    if(idx !== -1) selectInfo.value = idx;
+  }
+
+  function processarDadosIniciais() {
+    const idxDate = parseInt(document.getElementById('mapDate').value);
+    const idxProd = parseInt(document.getElementById('mapProd').value);
+    const idxD1 = parseInt(document.getElementById('mapDist1').value);
+    const idxD2 = parseInt(document.getElementById('mapDist2').value);
+
+    processedData = [];
+    memorialData = []; // Limpa o gráfico para novos dados
+
+    let validCount = 0;
+
+    for(let i = HEADER_ROW_IDX + 1; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      if(!row) continue;
+
+      let valProd = parseNum(row[idxProd]);
+      let valDist = parseNum(row[idxD1]) + parseNum(row[idxD2]);
+      let rawDate = row[idxDate];
+
+      if(valProd <= 0 && valDist <= 0) continue;
+
+      let dateObj = parseDate(rawDate);
+      if(!dateObj) continue;
+
+      let days = new Date(dateObj.y, dateObj.m, 0).getDate();
+      let dailyDist = valDist / days;
+      let valLoss = valProd - valDist;
+      let dailyLoss = valLoss / days; 
+      let percLoss = (valProd > 0) ? (valLoss / valProd) * 100 : 0;
+
+      validCount++;
+      
+      const item = {
+        id: validCount,
+        dateStr: `${pad(dateObj.m)}/${dateObj.y}`,
+        days: days,
+        vProd: valProd, vDist: valDist, dailyDist: dailyDist,
+        vLoss: valLoss, dailyLoss: dailyLoss, pLoss: percLoss
+      };
+      
+      processedData.push(item);
+      
+      // --- POPULA O GRÁFICO AUTOMATICAMENTE ---
+      memorialData.push({ label: item.dateStr, value: percLoss });
+    }
+
+    if(processedData.length === 0) { alert("Sem dados."); return; }
+
+    const refSelect = document.getElementById('refSelect');
+    refSelect.innerHTML = '<option value="-1">★ Média Geral (Padrão)</option>';
+    processedData.forEach(d => {
+      refSelect.add(new Option(`${d.dateStr} (Perda: ${d.pLoss.toFixed(2)}%)`, d.id));
+    });
+
+    atualizarReferencia();
+    
+    // Atualiza o gráfico com os dados importados
+    updateChart();
+
+    const cityName = document.getElementById('cityInput').value;
+    if(cityName) document.getElementById('setor').value = cityName;
+  }
+
+  function atualizarReferencia() {
+    const refSelect = document.getElementById('refSelect');
+    const selectedId = parseInt(refSelect.value);
+    
+    let baseFlowDist = 0;
+    let baseFlowLoss = 0;
+
+    if(selectedId === -1) {
+      let sumDist = processedData.reduce((acc, d) => acc + d.dailyDist, 0);
+      let sumLoss = processedData.reduce((acc, d) => acc + d.dailyLoss, 0);
+      baseFlowDist = sumDist / processedData.length;
+      baseFlowLoss = sumLoss / processedData.length;
+    } else {
+      const refItem = processedData.find(d => d.id === selectedId);
+      if(refItem) {
+        baseFlowDist = refItem.dailyDist;
+        baseFlowLoss = refItem.dailyLoss;
+        
+        document.getElementById('unit').value = 'm3d'; 
+        document.getElementById('qMic').value = refItem.dailyDist.toFixed(2);
+        document.getElementById('pLoss').value = refItem.pLoss.toFixed(2);
+        
+        const cityName = document.getElementById('cityInput').value || "Setor";
+        document.getElementById('setor').value = `${cityName} (${refItem.dateStr})`;
+        recalc();
+      }
+    }
+
+    const tbody = document.querySelector('#resultTable tbody');
+    tbody.innerHTML = "";
+
+    processedData.forEach(d => {
+      let kDist = (baseFlowDist > 0) ? d.dailyDist / baseFlowDist : 0;
+      let kLoss = (baseFlowLoss > 0) ? d.dailyLoss / baseFlowLoss : 0;
+
+      const isSelected = (d.id === selectedId);
+      const rowClass = isSelected ? 'class="selected-row"' : '';
+      const icon = isSelected ? '⭐' : '';
+
+      let tr = `<tr ${rowClass} data-id="${d.id}">
+        <td>${d.dateStr} ${icon}</td>
+        <td style="color:#666">${d.days}</td>
+        <td style="color:var(--prod-color); font-weight:bold">${format0(d.vProd)}</td>
+        <td>${format0(d.vDist)}</td>
+        <td style="font-weight:bold; color:var(--dist-color)">${format0(d.dailyDist)}</td>
+        <td class="bg-dist">${format4(kDist)}</td>
+        <td>${format0(d.vLoss)}</td>
+        <td><span style="background:${d.pLoss > 30 ? '#ef5350' : '#66bb6a'}; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em">${format2(d.pLoss)}%</span></td>
+        <td style="color:var(--loss-color)">${format0(d.dailyLoss)}</td>
+        <td class="bg-loss">${format4(kLoss)}</td>
+      </tr>`;
+      tbody.innerHTML += tr;
+    });
+
+    document.getElementById('resultsArea').style.display = 'block';
+  }
+
+  // ==========================================
+  // CALCULADORA & GRÁFICO
+  // ==========================================
+  
+  function recalc() {
+    const qMic = parseFloat(document.getElementById('qMic').value) || 0;
+    const pLoss = parseFloat(document.getElementById('pLoss').value) || 0;
+    const unit = document.getElementById('unit').value;
+    
+    let siv = (pLoss < 100) ? qMic / (1 - (pLoss/100)) : 0;
+    let loss = siv - qMic;
+    
+    const unitLbl = unit === 'm3h' ? 'm³/h' : (unit === 'ls' ? 'L/s' : 'm³/dia');
+    document.getElementById('sivOut').innerText = format2(siv) + ' ' + unitLbl;
+    document.getElementById('lossOut').innerText = format2(loss) + ' ' + unitLbl;
+
+    let pr = parseFloat(document.getElementById('pReal').value) || 0;
+    let pa = parseFloat(document.getElementById('pApar').value) || 0;
+    if((pr + pa) !== 100) { pa = 100 - pr; document.getElementById('pApar').value = pa; }
+
+    document.getElementById('barReal').style.width = pr + '%';
+    document.getElementById('barApar').style.width = pa + '%';
+
+    document.getElementById('lossReal').innerText = format2(loss * pr/100) + ' ' + unitLbl;
+    document.getElementById('lossApar').innerText = format2(loss * pa/100) + ' ' + unitLbl;
+
+    document.getElementById('saveBtn').disabled = (qMic <= 0);
+  }
+
+  // --- Gráfico Chart.js ---
+  // Registra o plugin de labels
+  Chart.register(ChartDataLabels);
+
+  let memorialData = []; 
+  let chartInstance = null;
+
+  function initChart() {
+    const ctx = document.getElementById('memorialChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'IPD (% Perdas)',
+          data: [],
+          borderColor: '#00ACC1', // Ciano/Verde-água
+          backgroundColor: 'rgba(0, 172, 193, 0.2)', // Preenchimento suave
+          borderWidth: 2,
+          pointBackgroundColor: '#00838F',
+          pointBorderColor: '#fff',
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          fill: true, // Estilo Área
+          tension: 0.3 
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: '#006064',
+            titleFont: { size: 14 },
+            bodyFont: { size: 16, weight: 'bold' },
+            callbacks: { label: function(c) { return c.parsed.y.toFixed(2) + '%'; } }
+          },
+          // Configuração do Datalabels (Rótulo fixo)
+          datalabels: {
+            align: 'top',
+            anchor: 'end',
+            color: '#006064',
+            font: { weight: 'bold', size: 11 },
+            formatter: function(value) {
+                return value.toFixed(1) + '%';
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: false, title: { display: true, text: '% Perdas' }, grid: { borderDash: [5,5] } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  function saveRecord() {
+    const ploss = parseFloat(document.getElementById('pLoss').value);
+    const label = new Date().toLocaleTimeString(); 
+    memorialData.push({ label: label, value: ploss });
+    updateChart();
+  }
+
+  function updateChart() {
+    if(!chartInstance) initChart();
+    chartInstance.data.labels = memorialData.map(d => d.label);
+    chartInstance.data.datasets[0].data = memorialData.map(d => d.value);
+    chartInstance.update();
+  }
+
+  function clearMemorial() {
+    memorialData = [];
+    updateChart();
+  }
+
+  function exportMemorial() {
+    if(!memorialData.length) return alert('Vazio');
+    let csv = "Data/Setor;IPD_Percent\n";
+    memorialData.forEach(r => csv += `${r.label};${r.value.toString().replace('.', ',')}\n`);
+    const blob = new Blob(["\uFEFF"+csv], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "Historico_IPD.csv";
+    a.click();
+  }
+
+  window.onload = initChart;
+
+  // --- Utils ---
+  function parseNum(v) { 
+      if(typeof v === 'number') return v;
+      if(!v) return 0;
+      let s = String(v).replace(/\./g, '').replace(',', '.');
+      return parseFloat(s) || 0;
+  }
+  function parseDate(v) {
+      if(typeof v === 'number') {
+          const date = new Date((v - 25569 + 0.5) * 86400 * 1000);
+          return {y: date.getFullYear(), m: date.getMonth()+1};
+      }
+      let s = String(v).trim();
+      if(s.includes('/')) {
+           let p = s.split('/'); 
+           if(p.length === 3) return {y: parseInt(p[2]), m: parseInt(p[1])};
+      } else if(s.includes('-')) {
+           let p = s.split('-');
+           return {y: parseInt(p[0]), m: parseInt(p[1])};
+      }
+      return null;
+  }
+  function format0(n) { return n.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0}); }
+  function format2(n) { return n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function format4(n) { return n.toLocaleString('pt-BR', {minimumFractionDigits:4, maximumFractionDigits:4}); }
+  function pad(n) { return n<10?'0'+n:n; }
+
+  function exportCSV() {
+    if(!processedData.length) return;
+    const city = document.getElementById('cityInput').value.trim() || "Sistema";
+    
+    const refSelect = document.getElementById('refSelect');
+    let selectedId = parseInt(refSelect.value);
+    let baseDist = 0, baseLoss = 0;
+    
+    if(selectedId === -1) {
+         baseDist = processedData.reduce((a,b)=>a+b.dailyDist,0)/processedData.length;
+         baseLoss = processedData.reduce((a,b)=>a+b.dailyLoss,0)/processedData.length;
+    } else {
+         const r = processedData.find(d=>d.id===selectedId);
+         if(r) { baseDist = r.dailyDist; baseLoss = r.dailyLoss; }
+    }
+
+    let csv = "Data;Dias;Prod_m3;Dist_m3;Vazao_Dist_Dia;K_Dist;Perda_m3;Perda_%;Vazao_Perda_Dia;K_Perda\n";
+    processedData.forEach(d => {
+      let kD = baseDist>0 ? d.dailyDist/baseDist : 0;
+      let kL = baseLoss>0 ? d.dailyLoss/baseLoss : 0;
+      csv += `${d.dateStr};${d.days};${String(d.vProd).replace('.',',')};${String(d.vDist).replace('.',',')};${String(d.dailyDist.toFixed(3)).replace('.',',')};${String(kD.toFixed(4)).replace('.',',')};${String(d.vLoss).replace('.',',')};${String(d.pLoss.toFixed(2)).replace('.',',')};${String(d.dailyLoss.toFixed(3)).replace('.',',')};${String(kL.toFixed(4)).replace('.',',')}\n`; 
+    });
+    const blob = new Blob(["\uFEFF"+csv], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Sazonalidade_${city.replace(/ /g,'_')}.csv`;
+    a.click();
+  }
+</script>
+
+</body>
+</html>

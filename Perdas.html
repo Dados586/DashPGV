@@ -1,0 +1,1479 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Calculadora & Memorial de Perdas (Reais x Aparentes)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      /* Paleta: fundo azul turquesa; letras azul escuro */
+      --turq-1:#0fdad7; --turq-2:#0aaeb2; --turq-3:#078e94;
+
+      --panel:#ffffff; --soft:#f3fbfb; --border:#bfe9ea; --border-2:#a7dfe1;
+      --text:#0a2340; --text-2:#12345a; --muted:#315a92;
+
+      --grad-real: linear-gradient(90deg, #13c4c2, #0ea5a7);
+      --grad-apar: linear-gradient(90deg, #5fd3f4, #2fa0e3);
+      --danger:#b91c1c;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans";
+      background:linear-gradient(160deg, var(--turq-1), var(--turq-2), var(--turq-3));
+      color:var(--text);
+      padding:0;
+    }
+
+    header{margin:0 0 12px 0; display:flex;align-items:center;gap:12px;flex-wrap:wrap; padding:12px 12px 0 12px;}
+    header h1{margin:0;font-size:1.6rem;color:var(--text)}
+    header .badge{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#e7fbfb;color:var(--text-2);font-weight:600}
+
+    /* Abas */
+    .nav-tabs{display:flex; gap:6px; padding:0 12px 8px 12px}
+    .tab-btn{background:#e9fdfe; border:1px solid var(--border-2); color:var(--text-2); border-radius:10px; padding:9px 12px; cursor:pointer; font-size:.95rem;}
+    .tab-btn.active{background:#d9fbfc; border-color:#9fe6ea; font-weight:700}
+    .view{display:none} .view.active{display:block}
+
+    /* Layout principal encostado à esquerda */
+    .container{margin:0; max-width:none; display:grid; grid-template-columns:1.15fr .85fr; gap:12px; padding:0 12px 12px 12px;}
+    @media (max-width:1100px){ .container{grid-template-columns:1fr} }
+
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px; box-shadow:0 8px 18px rgba(0,0,0,.08)}
+    .card h2{margin:0 0 8px 0; font-size:1.08rem; color:var(--text-2)}
+
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+    .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    label{font-size:.9rem;color:var(--text-2)}
+    input[type="number"], input[type="text"], select{background:var(--soft); color:var(--text); border:1px solid var(--border); border-radius:10px;padding:9px 10px;font-size:1rem;outline:none}
+    input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0}
+    .hint{font-size:.84rem;color:var(--muted)}
+    .error{margin-top:8px;color:var(--danger);font-size:.9rem}
+
+    .result{margin-top:10px;border-top:1px dashed var(--border-2);padding-top:10px; display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .stat{background:#f7ffff;border:1px solid var(--border-2); border-radius:10px;padding:10px}
+    .stat .label{font-size:.8rem;color:var(--muted);line-height:1.15}
+    .stat .value{font-weight:700;font-size:1.02rem;margin-top:6px;color:var(--text)}
+
+    .bar{height:10px;border-radius:999px;overflow:hidden;background:#dff6f7;border:1px solid var(--border-2)}
+    .bar>div{height:100%}
+    .bar .real{background:var(--grad-real)} .bar .apar{background:var(--grad-apar)}
+
+    .btn{background:#e9fdfe; border:1px solid var(--border-2); border-radius:10px; color:var(--text-2); padding:9px 12px; font-size:.96rem; cursor:pointer}
+    .btn:hover{transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.12)}
+    .btn.accent{background:#d9fbfc; color:var(--text); border-color:#9fe6ea}
+    .btn.danger{background:#ffecec; border-color:#f5b1b1; color:#7a1111}
+    .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .footnote{font-size:.82rem;color:var(--muted);margin-top:8px}
+
+    /* Tabela */
+    .table-wrap{max-height:560px; overflow:auto; margin-top:8px; border:1px solid var(--border); border-radius:10px}
+    table{width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:.92rem}
+    thead th{position:sticky;top:0;background:#e7fbfb;border-bottom:1px solid var(--border-2); padding:9px 8px;text-align:left;font-size:.88rem;color:var(--text-2);z-index:1; line-height:1.15; white-space:normal;}
+    tbody td{border-bottom:1px dashed var(--border-2);padding:8px;color:var(--text); overflow:hidden;text-overflow:ellipsis;white-space:nowrap; font-variant-numeric: tabular-nums;}
+    tbody tr:hover{background:#f2feff}
+    td.right, th.right{text-align:right}
+    th.w-num, td.w-num{width: 8.8rem}
+    th.w-pct, td.w-pct{width: 6.2rem}
+    th.w-mini, td.w-mini{width: 4.2rem}
+    th.w-setor, td.w-setor{width: 12rem}
+    .tag{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--border-2);background:#f0feff;font-size:.84rem;color:var(--text-2)}
+    .status-tag{font-size:.75rem; padding:1px 5px; border-radius:4px; margin-right:2px; border:1px solid #ccc; display:inline-block;}
+    .st-ativa{background:#dcfce7; border-color:#86efac; color:#14532d;}
+    .st-cortada{background:#fee2e2; border-color:#fca5a5; color:#7f1d1d;}
+    .st-pedido{background:#ffedd5; border-color:#fdba74; color:#7c2d12;}
+
+    .pct-wrap{display:flex; align-items:center; justify-content:flex-end; gap:4px}
+    .cell-pct, .cell-share, .cell-pEff{width:100%; max-width:5.4rem; background:#fff; border:1px solid var(--border-2); border-radius:8px; padding:6px 8px; color:var(--text); font-variant-numeric: tabular-nums;}
+    .cell-pct{ text-align:right; }
+    .cell-share{ text-align:right; }
+    .unit-suf{color:var(--muted); font-size:.86rem}
+    .lock-wrap{display:flex; align-items:center; justify-content:center}
+    .lock-wrap input{transform:scale(1.2)}
+
+    /* ===== Centralização da coluna "% Perdas (efet.)" ===== */
+    .center-pct { text-align: center !important; }
+    .pct-wrap.center { justify-content: center; gap: 6px; }
+    .cell-pEff { max-width:5.2rem; text-align:center; padding:6px 8px; }
+    td.col-pEff, th.col-pEff { padding-left:6px !important; padding-right:6px !important; }
+
+    /* GRÁFICOS */
+    .charts{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:12px}
+    @media (max-width:1100px){ .charts{grid-template-columns:1fr} }
+    .chart-card{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px}
+    .chart-title{margin:0 0 8px 0; color:var(--text-2); font-size:1rem}
+    .legend{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+    .leg-item{display:flex; align-items:center; gap:6px; font-size:.86rem; color:var(--text-2)}
+    .swatch{width:12px; height:12px; border-radius:3px; border:1px solid #ddd}
+
+    /* Report (A4 paisagem) */
+    .print-report{display:none}
+    .report-page{background:#fff; color:#000}
+    .report-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px}
+    .report-title{font-size:1.1rem; font-weight:700; color:#0a2340}
+    .report-meta{font-size:.9rem; color:#0a2340}
+    .report-vp{position:relative; width:100%; height:calc(100% - 40px); overflow:hidden; border:1px solid #ddd; background:#fff}
+    .report-content{transform-origin: top left;}
+    .report-note{font-size:.8rem; color:#444; margin-top:6px}
+
+    footer{padding:10px 12px 18px 12px; color:var(--text-2); font-size:.9rem}
+
+    @media print{
+      @page{ size: A4 landscape; margin:12mm; }
+      body *:not(.print-report):not(.print-report *){
+        display:none !important;
+      }
+      .print-report{display:block !important; height:100%; }
+      .report-page{page-break-after:always; height:100%;}
+      .report-page:last-child{page-break-after:auto;}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Calculadora & Memorial de Perdas (Reais x Aparentes)</h1>
+    <div class="badge">HydroResolve • Engenharia</div>
+  </header>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" id="tabManual" type="button">▶ Entradas Manuais</button>
+    <button class="tab-btn" id="tabBatch" type="button">⬇ Lote (Excel – Copiar/Colar)</button>
+  </div>
+
+  <div class="view active" id="viewManual">
+    <div class="container">
+      <section class="card" id="calcCard">
+        <h2>Entradas</h2>
+
+        <div class="row">
+          <div class="field">
+            <label for="setor">Nome do Setor</label>
+            <input type="text" id="setor" placeholder="Ex.: DMA Centro 01" />
+            <div class="hint">Será gravado no memorial junto com os volumes.</div>
+          </div>
+          <div class="field">
+            <label for="unit">Unidade do Micromedido</label>
+            <select id="unit">
+              <option value="m3h">m³/h</option>
+              <option value="ls">L/s</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="qMic">Micromedido <span class="hint">(corresponde a <b>100% − %Perdas</b>)</span></label>
+            <input type="number" id="qMic" min="0" step="0.0001" placeholder="Ex.: 120.5" />
+          </div>
+          <div class="field">
+            <label for="pLoss">% de Perdas da Região</label>
+            <input type="number" id="pLoss" min="0" max="99.9999" step="0.0001" placeholder="Ex.: 35" />
+            <div class="hint">% total de perdas (ex.: 35 para 35%).</div>
+          </div>
+        </div>
+
+        <div class="error" id="errBox" style="display:none;"></div>
+
+        <div class="result">
+          <div class="stat">
+            <div class="label">Macromedido (SIV) – calculado</div>
+            <div class="value" id="sivOut">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Perdas Totais (mesma unidade do micromedido)</div>
+            <div class="value" id="lossOut">—</div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:12px;">Divisão de Perdas</h2>
+        <div class="row">
+          <div class="field">
+            <label for="pReal">% Perdas Reais</label>
+            <input type="number" id="pReal" min="0" max="100" step="0.01" value="70" />
+            <div class="hint">Ex.: 70% do volume de perdas em Reais (vazamentos).</div>
+          </div>
+          <div class="field">
+            <label for="pApar">% Perdas Aparentes</label>
+            <input type="number" id="pApar" min="0" max="100" step="0.01" value="30" />
+            <div class="hint">Ex.: 30% do volume de perdas em Aparentes (submedição, fraudes, etc.).</div>
+          </div>
+        </div>
+
+        <div class="bar" style="margin-top:10px; position:relative;">
+          <div id="barReal" class="real" style="width:70%; float:left;"></div>
+          <div id="barApar" class="apar" style="width:30%; float:left;"></div>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+          <div class="stat">
+            <div class="label">Perdas<br>Reais (vazão)</div>
+            <div class="value" id="lossReal">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Perdas<br>Aparentes (vazão)</div>
+            <div class="value" id="lossApar">—</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn accent" id="saveBtn" disabled>💾 Salvar no Memorial</button>
+          <span class="hint">Preencha valores válidos e o nome do setor para habilitar.</span>
+        </div>
+
+        <div class="footnote">
+          Fórmulas: <b>Perdas = Micromedido × p/(100−p)</b> e <b>SIV = Micromedido/(1 − p/100)</b>.
+        </div>
+      </section>
+
+      <section class="card" id="memCard">
+        <h2>Memorial</h2>
+
+        <div class="btn-row" style="margin-top:6px;">
+          <button class="btn" id="exportCsvBtn">⬇ Exportar CSV</button>
+          <button class="btn" id="printBtn">🖨️ Imprimir / Salvar em PDF</button>
+          <button class="btn danger" id="clearAllBtn">🧹 Limpar Memorial</button>
+        </div>
+
+        <div class="table-wrap">
+          <table id="memTable">
+            <thead>
+              <tr>
+                <th>Data/Hora</th>
+                <th class="w-setor">Setor</th>
+                <th class="w-mini">Un</th>
+                <th class="right w-num">Micromedido</th>
+                <th class="right w-pct">% Perdas</th>
+                <th class="right w-num">SIV</th>
+                <th class="right w-num">Perdas Totais</th>
+                <th class="right w-pct">Perdas<br>Reais (%)</th>
+                <th class="right w-pct">Perdas<br>Aparentes (%)</th>
+                <th class="right w-num">Perdas<br>Reais</th>
+                <th class="right w-num">Perdas<br>Aparentes</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="memTbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="view" id="viewBatch">
+    <section class="card" style="margin:0 12px 12px 12px">
+      <h2>Entrada em Lote (Excel – Copiar/Colar)</h2>
+
+      <div class="row-3" style="background:#eafefe; padding:10px; border-radius:10px; border:1px solid #bcebeb;">
+        <div class="field">
+          <label for="batchUnit" style="font-weight:700; color:var(--text-2);">1. Unidade de ENTRADA</label>
+          <select id="batchUnit" style="background:#fff;">
+            <option value="m3h">m³/h</option>
+            <option value="ls">L/s</option>
+          </select>
+          <div class="hint">Unidade dos dados colados abaixo.</div>
+        </div>
+        <div class="field">
+          <label for="displayUnit" style="font-weight:700; color:var(--text-2);">2. Unidade de SAÍDA (Resultados)</label>
+          <select id="displayUnit" style="background:#fff;">
+            <option value="m3h">m³/h</option>
+            <option value="ls">L/s</option>
+          </select>
+          <div class="hint">Como a tabela e gráficos serão mostrados.</div>
+        </div>
+        <div class="field">
+          <label for="batchLoss">IPD / % Perdas (Cidade)</label>
+          <input id="batchLoss" type="number" min="0" max="99.9999" step="0.0001" placeholder="Ex.: 35" style="background:#fff;" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Divisão de Perdas (padrão)</label>
+          <div class="btn-row" style="gap:6px">
+            <input id="batchReal" type="number" min="0" max="100" step="0.01" value="70" style="width:7rem" />
+            <span class="hint" style="align-self:center">Reais %</span>
+            <input id="batchApar" type="number" min="0" max="100" step="0.01" value="30" style="width:7rem" />
+            <span class="hint" style="align-self:center">Aparentes %</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:10px">
+        <label for="pasteBox">Cole aqui os dados (Ctrl+V): <b>Label</b>, <b>Demanda</b>, <b>Zona</b>, <b>Status Ligação</b></label>
+        <textarea class="paste" id="pasteBox" style="width:100%; min-height:180px; background:#ffffff; border:1px dashed var(--border-2); border-radius:10px; padding:10px; color:var(--text); font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono';" placeholder="Exemplo:
+Label[TAB]Demanda[TAB]Zona[TAB]Status Ligação
+Ligação 01[TAB]12,5[TAB]DMA Centro[TAB]Ativa
+Ligação 02[TAB]9,7[TAB]DMA Centro[TAB]Cortada
+Ligação 03[TAB]8,3[TAB]DMA Norte[TAB]Corte Pedido"></textarea>
+        <div class="hint">Colunas separadas por TAB. A 4ª coluna (Status) é usada para média e contagem (Ativa, Cortada, Corte Pedido).</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn accent" id="btnProcessar">⚙ Processar</button>
+        <button class="btn" id="btnEqualizar">↔ Equalizar Desbloqueadas</button>
+        <button class="btn" id="btnLockAll">🔒 Travar Todos</button>
+        <button class="btn" id="btnUnlockAll">🔓 Destravar Todos</button>
+        <button class="btn" id="btnResetShares">⟲ Resetar Participações</button>
+        <button class="btn" id="btnExportAgg">⬇ Exportar CSV (Zonas)</button>
+        <button class="btn" id="btnExportDet">⬇ Exportar CSV (Detalhado)</button>
+        <button class="btn" id="btnRelatorio">📝 Relatório Técnico (PDF)</button>
+        <button class="btn" id="btnSalvarCenario">💾 Salvar Cenário</button>
+        <label class="btn" for="inpLoadCenario" style="cursor:pointer">📂 Carregar Cenário</label>
+        <input id="inpLoadCenario" type="file" accept=".json" style="display:none" />
+        <button class="btn danger" id="btnLimpar">🧹 Limpar</button>
+      </div>
+
+      <div class="error" id="batchErr" style="display:none;"></div>
+
+      <div class="table-wrap" style="margin-top:10px">
+        <table id="tblAgg">
+          <thead>
+            <tr>
+              <th class="w-setor">Zona</th>
+              <th class="right w-num">Qtd. Total</th>
+              <th class="right w-num">Demanda (Soma)</th>
+              <th class="w-pct col-pEff center-pct">% Perdas (efet.)<br><small>(editável)</small></th>
+              <th class="right w-num">SIV</th>
+              <th class="right w-num">Perdas Totais</th>
+              <th class="right w-pct">Part.<br>Perdas (%)</th>
+              <th style="width:4.5rem;">Travar</th>
+              <th class="right w-pct">Perdas<br>Reais (%)</th>
+              <th class="right w-pct">Perdas<br>Aparentes (%)</th>
+              <th class="right w-num">Perdas<br>Reais</th>
+              <th class="right w-num">Perdas<br>Aparentes</th>
+            </tr>
+          </thead>
+          <tbody id="aggBody"></tbody>
+        </table>
+      </div>
+
+      <div class="charts" id="charts">
+        <div class="chart-card">
+          <h3 class="chart-title">Perdas Reais por Zona</h3>
+          <canvas id="pieReal" width="360" height="240"></canvas>
+          <div class="legend" id="legReal"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Perdas Aparentes por Zona</h3>
+          <canvas id="pieApar" width="360" height="240"></canvas>
+          <div class="legend" id="legApar"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Perdas Totais por Zona</h3>
+          <canvas id="pieTot" width="360" height="240"></canvas>
+          <div class="legend" id="legTot"></div>
+        </div>
+      </div>
+
+      <section class="card" style="margin-top:12px; border-color:#9fe6ea; background:#faffff;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <h2 style="color:var(--turq-3); margin:0;">Estatísticas e Quantidades por Status</h2>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label for="statsUnit" style="font-size:0.9rem; color:var(--text-2);">Unidade da Média:</label>
+            <select id="statsUnit" style="padding:6px 10px; font-size:0.9rem;">
+              <option value="m3m" selected>m³/mês (30d)</option>
+              <option value="m3h">m³/h</option>
+              <option value="ls">L/s</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:10px;">
+          <table id="tblStats">
+            <thead>
+              <tr>
+                <th class="w-setor">Zona</th>
+                <th class="right" style="width:5rem">Total</th>
+                <th class="right" style="width:5rem; color:#14532d; background:#f0fdf4">Ativas</th>
+                <th class="right" style="width:5rem; color:#7f1d1d; background:#fef2f2">Cortadas</th>
+                <th class="right" style="width:6rem; color:#7c2d12; background:#fff7ed">Corte Pedido</th>
+                <th class="right" style="width:5rem">Outros</th>
+                <th class="right w-num">Demanda Total</th>
+                <th class="right w-num" id="colMeanHeader">Média (Só Ativas)</th>
+              </tr>
+            </thead>
+            <tbody id="statsBody">
+              <tr><td colspan="8" style="text-align:center;color:#888;padding:12px">Nenhum dado processado ainda.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="footnote">Edite **% Perdas (efet.)** por zona (mantemos o total de perdas) e use **Travar** para fixar alguma zona enquanto ajusta as demais. A **Part. Perdas (%)** é calculada automaticamente.</div>
+    </section>
+  </div>
+
+  <div class="print-report" id="printReportRoot">
+    <section class="report-page" id="rp1">
+      <div class="report-header">
+        <div class="report-title">Relatório Técnico – Perdas por Zona (Tabela Consolidada)</div>
+        <div class="report-meta" id="rp1Meta"></div>
+      </div>
+      <div class="report-vp" id="rp1Viewport">
+        <div class="report-content" id="rp1Content"></div>
+      </div>
+      <div class="report-note">A tabela foi ajustada para caber integralmente em A4 (paisagem).</div>
+    </section>
+
+    <section class="report-page" id="rp2">
+      <div class="report-header">
+        <div class="report-title">Relatório Técnico – Gráficos e Médias</div>
+        <div class="report-meta" id="rp2Meta"></div>
+      </div>
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
+        <div>
+          <h4 style="margin:0 0 6px 0; color:#0a2340;">Perdas Reais por Zona</h4>
+          <img id="imgReal" alt="Perdas Reais" style="width:100%; border:1px solid #ddd; border-radius:8px; background:#fff" />
+        </div>
+        <div>
+          <h4 style="margin:0 0 6px 0; color:#0a2340;">Perdas Aparentes por Zona</h4>
+          <img id="imgApar" alt="Perdas Aparentes" style="width:100%; border:1px solid #ddd; border-radius:8px; background:#fff" />
+        </div>
+        <div>
+          <h4 style="margin:0 0 6px 0; color:#0a2340;">Perdas Totais por Zona</h4>
+          <img id="imgTot" alt="Perdas Totais" style="width:100%; border:1px solid #ddd; border-radius:8px; background:#fff" />
+        </div>
+      </div>
+
+      <h4 style="margin:0 0 6px 0; color:#0a2340;">Estatísticas de Quantidades e Consumo (Média sobre Ativas)</h4>
+      <div class="table-wrap" style="border:1px solid #ddd; border-radius:8px;">
+        <table id="tblStatsReport" style="width:100%; font-size:0.80rem;">
+          <thead style="background:#f0f0f0;">
+            <tr>
+              <th style="padding:6px; text-align:left;">Zona</th>
+              <th style="padding:6px; text-align:right;">Total</th>
+              <th style="padding:6px; text-align:right;">Ativas</th>
+              <th style="padding:6px; text-align:right;">Cortadas</th>
+              <th style="padding:6px; text-align:right;">Corte Pedido</th>
+              <th style="padding:6px; text-align:right;">Outros</th>
+              <th style="padding:6px; text-align:right;">Demanda Total</th>
+              <th style="padding:6px; text-align:right;" id="colMeanHeaderReport">Média (Só Ativas)</th>
+            </tr>
+          </thead>
+          <tbody id="statsReportBody"></tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <section class="report-page" id="rp3">
+      <div class="report-header">
+        <div class="report-title">Relatório Técnico – Identificação</div>
+        <div class="report-meta" id="rp3Meta"></div>
+      </div>
+      <div style="margin-top:24px; font-size:1rem; color:#0a2340;">
+        <p>Este relatório foi gerado automaticamente pela ferramenta de cálculo e consolidação de perdas por zona.</p>
+        <p>As médias de consumo por ligação foram calculadas dividindo a <b>Demanda Total da Zona</b> apenas pelo número de <b>Ligações Ativas</b>.</p>
+        <p><b>Nota sobre a Média:</b> Caso a unidade selecionada seja m³/mês, foi considerado o mês comercial de 30 dias (720 horas).</p>
+        <p><b>Desenvolvido por:</b> Kelvin Zeferino de Souza</p>
+      </div>
+    </section>
+  </div>
+
+  <footer>Desenvolvido por <b>Kelvin Zeferino de Souza</b></footer>
+
+  <script>
+    /* ========= Utils ========= */
+    const clamp = (v, lo, hi)=> Math.max(lo, Math.min(hi, v));
+    function toBase(q, unit){ if(!isFinite(q)) return NaN; return unit==='m3h' ? q : q*3.6; }
+    function fromBase(q, unit){ if(!isFinite(q)) return NaN; return unit==='m3h' ? q : q/3.6; }
+    function fmtUnit(u){ return u==='m3h' ? 'm³/h' : 'L/s'; }
+    function fmtQty(q){ if(!isFinite(q)) return '—'; const a=Math.abs(q); const v=a>=100?q.toFixed(2):a>=10?q.toFixed(3):a>=1?q.toFixed(4):q.toFixed(5); return v; }
+    function fmtPct(p){ if(!isFinite(p)) return '—'; return p.toFixed(2)+'%'; }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    /* ========= Aba Manual ========= */
+    const setorEl = document.getElementById('setor');
+    const unitEl  = document.getElementById('unit');
+    const qMicEl  = document.getElementById('qMic');
+    const pLossEl = document.getElementById('pLoss');
+
+    const sivOut  = document.getElementById('sivOut');
+    const lossOut = document.getElementById('lossOut');
+
+    const pRealEl = document.getElementById('pReal');
+    const pAparEl = document.getElementById('pApar');
+    const barReal = document.getElementById('barReal');
+    const barApar = document.getElementById('barApar');
+    const lossReal= document.getElementById('lossReal');
+    const lossApar= document.getElementById('lossApar');
+
+    const errBox  = document.getElementById('errBox');
+    const saveBtn = document.getElementById('saveBtn');
+
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const printBtn     = document.getElementById('printBtn');
+    const clearAllBtn  = document.getElementById('clearAllBtn');
+    const memTbody     = document.getElementById('memTbody');
+
+    let current = { valid:false, unit:'m3h', qMic:NaN, pLoss:NaN, siv:NaN, loss:NaN, pReal:70, pApar:30, lossReal:NaN, lossApar:NaN };
+    function showError(msg){ errBox.style.display='block'; errBox.textContent=msg; saveBtn.disabled=true; }
+    function clearError(){ errBox.style.display='none'; errBox.textContent=''; }
+
+    function recalc(){
+      clearError();
+      const unit = unitEl.value;
+      const qMic = Number.parseFloat(qMicEl.value);
+      const p    = Number.parseFloat(pLossEl.value);
+
+      if(!isFinite(qMic) || qMic < 0){ showError('Micromedido inválido.'); sivOut.textContent=lossOut.textContent=lossReal.textContent=lossApar.textContent='—'; current.valid=false; return; }
+      if(!isFinite(p) || p < 0 || p >= 100){ showError('O % de Perdas deve estar entre 0 e 99.9999.'); sivOut.textContent=lossOut.textContent=lossReal.textContent=lossApar.textContent='—'; current.valid=false; return; }
+
+      const qMicBase = toBase(qMic, unit);
+      const pFrac    = p/100;
+      const sivBase  = qMicBase / (1-pFrac);
+      const lossBase = sivBase - qMicBase;
+
+      const sivUnit  = fromBase(sivBase, unit);
+      const lossUnit = fromBase(lossBase, unit);
+
+      sivOut.textContent  = `${fmtQty(sivUnit)} ${fmtUnit(unit)}`;
+      lossOut.textContent = `${fmtQty(lossUnit)} ${fmtUnit(unit)}`;
+
+      let pr = Number.parseFloat(pRealEl.value), pa = Number.parseFloat(pAparEl.value);
+      if(!isFinite(pr)) pr=0; if(!isFinite(pa)) pa=0;
+      let s = pr+pa; if(s<=0){ pr=100; pa=0; s=100; }
+      pr = pr/s*100; pa = 100 - pr;
+      pRealEl.value = pr.toFixed(2); pAparEl.value = pa.toFixed(2);
+      barReal.style.width = `${pRealEl.value}%`; barApar.style.width = `${pAparEl.value}%`;
+
+      const lossRealBase = lossBase * (pr/100);
+      const lossAparBase = lossBase * (pa/100);
+
+      lossReal.textContent = `${fmtQty(fromBase(lossRealBase, unit))} ${fmtUnit(unit)}`;
+      lossApar.textContent = `${fmtQty(fromBase(lossAparBase, unit))} ${fmtUnit(unit)}`;
+
+      current = { valid:true, unit, qMic, pLoss:p, siv:sivUnit, loss:lossUnit, pReal:parseFloat(pRealEl.value), pApar:parseFloat(pAparEl.value), lossReal:fromBase(lossRealBase, unit), lossApar:fromBase(lossAparBase, unit) };
+      saveBtn.disabled = !(current.valid && setorEl.value.trim().length>0);
+    }
+
+    ['input','change'].forEach(evt=>{
+      unitEl.addEventListener(evt, recalc);
+      qMicEl.addEventListener(evt, recalc);
+      pLossEl.addEventListener(evt, recalc);
+      pRealEl.addEventListener(evt, recalc);
+      pAparEl.addEventListener(evt, recalc);
+      setorEl.addEventListener(evt, ()=>{ saveBtn.disabled = !(current.valid && setorEl.value.trim().length>0); });
+    });
+
+    const STORAGE_KEY = 'hydroresolve_perdas_memorial_v9';
+    let memorial = [];
+    function loadMemorial(){ try{ const raw=localStorage.getItem(STORAGE_KEY); memorial = raw?JSON.parse(raw):[]; }catch(e){ memorial=[]; } renderMemorial(); }
+    function saveMemorial(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(memorial)); }
+    function renderMemorial(){
+      memTbody.innerHTML = '';
+      for(const row of memorial){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.dataHora}</td>
+          <td class="w-setor"><span class="tag">${escapeHtml(row.setor)}</span></td>
+          <td class="w-mini">${fmtUnit(row.unit)}</td>
+          <td class="right w-num">${fmtQty(row.qMic)}</td>
+          <td class="right w-pct">${fmtPct(row.pLoss)}</td>
+          <td class="right w-num">${fmtQty(row.siv)}</td>
+          <td class="right w-num">${fmtQty(row.loss)}</td>
+          <td class="right w-pct">${fmtPct(row.pReal)}</td>
+          <td class="right w-pct">${fmtPct(row.pApar)}</td>
+          <td class="right w-num">${fmtQty(row.lossReal)}</td>
+          <td class="right w-num">${fmtQty(row.lossApar)}</td>
+          <td><button class="btn danger" data-id="${row.id}">Excluir</button></td>
+        `;
+        memTbody.appendChild(tr);
+      }
+      memTbody.querySelectorAll('button[data-id]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = btn.getAttribute('data-id');
+          memorial = memorial.filter(r=>String(r.id)!==String(id));
+          saveMemorial(); renderMemorial();
+        });
+      });
+    }
+    function saveRecord(){
+      if(!current.valid){ alert('Preencha valores válidos antes de salvar.'); return; }
+      if(!setorEl.value.trim()){ alert('Informe o Nome do Setor.'); return; }
+      const now=new Date(); const two=n=>String(n).padStart(2,'0');
+      const dataHora=`${two(now.getDate())}/${two(now.getMonth()+1)}/${now.getFullYear()} ${two(now.getHours())}:${two(now.getMinutes())}:${two(now.getSeconds())}`;
+      const row={ id:Date.now(), dataHora, setor:setorEl.value.trim(), unit:current.unit, qMic:current.qMic, pLoss:current.pLoss, siv:current.siv, loss:current.loss, pReal:current.pReal, pApar:current.pApar, lossReal:current.lossReal, lossApar:current.lossApar };
+      memorial.push(row); saveMemorial(); renderMemorial();
+      saveBtn.textContent='✅ Salvo!'; setTimeout(()=>{ saveBtn.textContent='💾 Salvar no Memorial'; }, 900);
+    }
+    document.getElementById('saveBtn').addEventListener('click', saveRecord);
+    exportCsvBtn.addEventListener('click', ()=>{
+      if(memorial.length===0){ alert('Memorial vazio.'); return; }
+      const sep=';'; const header=['DataHora','Setor','Unidade','Micromedido','PercentualPerdas','SIV','PerdasTotais','PercentualReais','PercentualAparentes','PerdasReais','PerdasAparentes'];
+      const lines=[header.join(sep)];
+      for(const r of memorial){
+        lines.push([ r.dataHora, `"${String(r.setor).replace(/"/g,'""')}"`, fmtUnit(r.unit),
+          fmtQty(r.qMic).replace('.',','), r.pLoss.toFixed(2).replace('.',','), fmtQty(r.siv).replace('.',','), fmtQty(r.loss).replace('.',','),
+          r.pReal.toFixed(2).replace('.' ,','), r.pApar.toFixed(2).replace('.',','), fmtQty(r.lossReal).replace('.',','), fmtQty(r.lossApar).replace('.',',') ].join(sep));
+      }
+      const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=`memorial_perdas_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
+    printBtn.addEventListener('click', ()=>window.print());
+    clearAllBtn.addEventListener('click', ()=>{ if(confirm('Tem certeza que deseja apagar todos os registros do memorial?')){ memorial=[]; saveMemorial(); renderMemorial(); } });
+    recalc(); loadMemorial();
+
+    /* ========= Abas (fix) ========= */
+    const tabManual = document.getElementById('tabManual');
+    const tabBatch  = document.getElementById('tabBatch');
+    const viewManual= document.getElementById('viewManual');
+    const viewBatch = document.getElementById('viewBatch');
+    tabManual.addEventListener('click', ()=>{
+      tabManual.classList.add('active'); tabBatch.classList.remove('active');
+      viewManual.classList.add('active'); viewBatch.classList.remove('active');
+    });
+    tabBatch.addEventListener('click', ()=>{
+      tabBatch.classList.add('active'); tabManual.classList.remove('active');
+      viewBatch.classList.add('active'); viewManual.classList.remove('active');
+    });
+
+    /* ========= Aba Lote ========= */
+    const pasteBox   = document.getElementById('pasteBox');
+    const batchUnit  = document.getElementById('batchUnit');
+    const displayUnit= document.getElementById('displayUnit'); // Novo seletor de saída
+    const batchLoss  = document.getElementById('batchLoss');
+    const batchReal  = document.getElementById('batchReal');
+    const batchApar  = document.getElementById('batchApar');
+    const btnProc    = document.getElementById('btnProcessar');
+    const btnEqual   = document.getElementById('btnEqualizar');
+    const btnLockAll = document.getElementById('btnLockAll');
+    const btnUnlockAll = document.getElementById('btnUnlockAll');
+    const btnResetShares = document.getElementById('btnResetShares');
+    const btnExpAgg  = document.getElementById('btnExportAgg');
+    const btnExpDet  = document.getElementById('btnExportDet');
+    const btnRel     = document.getElementById('btnRelatorio');
+    const btnSalvarCenario = document.getElementById('btnSalvarCenario');
+    const inpLoadCenario   = document.getElementById('inpLoadCenario');
+    const btnLimpar  = document.getElementById('btnLimpar');
+    const aggBody    = document.getElementById('aggBody');
+    const batchErr   = document.getElementById('batchErr');
+
+    const pieReal    = document.getElementById('pieReal');
+    const pieApar    = document.getElementById('pieApar');
+    const pieTot     = document.getElementById('pieTot');
+    const legReal    = document.getElementById('legReal');
+    const legApar    = document.getElementById('legApar');
+    const legTot     = document.getElementById('legTot');
+    
+    // Novo seletor de estatísticas (já existia, mas agora trabalhamos em conjunto)
+    const statsUnitSel = document.getElementById('statsUnit');
+
+    // Relatório
+    const printRoot  = document.getElementById('printReportRoot');
+    const rp1Meta    = document.getElementById('rp1Meta');
+    const rp2Meta    = document.getElementById('rp2Meta');
+    const rp3Meta    = document.getElementById('rp3Meta');
+    const rp1Viewport= document.getElementById('rp1Viewport');
+    const rp1Content = document.getElementById('rp1Content');
+    const imgReal    = document.getElementById('imgReal');
+    const imgApar    = document.getElementById('imgApar');
+    const imgTot     = document.getElementById('imgTot');
+
+    let batchAgg = [];       // zonas
+    let batchDet = [];       // detalhado (para export)
+    let totalLossBase = 0;   // perdas totais (base)
+    let commonUnit = 'm3h';  // unidade de EXIBIÇÃO
+    let initialShares = [];  // p/ reset
+
+    function normalizePercInputs(){
+      let pr=Number.parseFloat(batchReal.value), pa=Number.parseFloat(batchApar.value);
+      if(!isFinite(pr)) pr=0; if(!isFinite(pa)) pa=0;
+      let s=pr+pa; if(s<=0){ pr=100; pa=0; s=100; }
+      pr=pr/s*100; pa=100-pr;
+      batchReal.value=pr.toFixed(2); batchApar.value=pa.toFixed(2);
+      return {pr, pa};
+    }
+
+    function parseTSV(text){
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+      if(lines.length===0) return [];
+      const first = lines[0].split('\t').map(s=>s.trim().toLowerCase());
+      // Detecta se tem a coluna status
+      const hasHeader = first.includes('label') && (first.includes('demanda') || first.includes('demand')) && (first.includes('zona') || first.includes('zone'));
+      const rows=[];
+      for(let i=hasHeader?1:0;i<lines.length;i++){
+        const parts = lines[i].split('\t');
+        if(parts.length<3) continue;
+        const label = parts[0].trim();
+        const demRaw= parts[1].trim().replace(',','.'); // vírgula -> ponto
+        const zona  = (parts[2]||'').trim();
+        // Leitura da coluna de status (índice 3), default "Ativa" se não existir
+        let status = (parts[3]||'Ativa').trim(); 
+        if(!status) status = 'Ativa';
+
+        if(!zona){ continue; }
+        const q = Number.parseFloat(demRaw);
+        if(!isFinite(q)) continue;
+        rows.push({label, demanda:q, zona, status});
+      }
+      return rows;
+    }
+
+    function processBatch(){
+      clearBatchError();
+      aggBody.innerHTML = ''; batchAgg = []; batchDet = []; initialShares = [];
+      clearCharts();
+
+      // Definir unidade de SAÍDA
+      commonUnit = displayUnit.value;
+      
+      // Definir unidade de ENTRADA
+      const inputUnit = batchUnit.value;
+
+      const p    = Number.parseFloat(batchLoss.value);
+      if(!isFinite(p) || p<0 || p>=100){ showBatchError('Informe um IPD / %Perdas válido (0 a <100).'); return; }
+      const {pr, pa} = normalizePercInputs();
+
+      const rows = parseTSV(pasteBox.value);
+      if(rows.length===0){ showBatchError('Nenhuma linha válida com ZONA foi encontrada (linhas sem ZONA são desconsideradas).'); return; }
+
+      // Converte da unidade de ENTRADA para a BASE (m3h)
+      const det = rows.map(r=>({ ...r, micBase: toBase(r.demanda, inputUnit)})).filter(r=>isFinite(r.micBase));
+      
+      if(det.length===0){ showBatchError('Nenhuma demanda numérica válida após conversão de unidade.'); return; }
+      // guardar detalhado para export (usando a unidade de SAÍDA para consistência)
+      batchDet = det.map(r=>({ 
+        label:r.label, 
+        zona:r.zona, 
+        status:r.status, 
+        unidade:fmtUnit(commonUnit), 
+        mic: fromBase(r.micBase, commonUnit) 
+      }));
+
+      const byZone = new Map();
+      for(const r of det){
+        const z = r.zona;
+        // Inicializa acumuladores
+        if(!byZone.has(z)) byZone.set(z, {zona:z, itens:0, micBase:0, cntAtiva:0, cntCortada:0, cntPedido:0, cntOutros:0});
+        const acc = byZone.get(z);
+        
+        acc.itens += 1; 
+        acc.micBase += r.micBase;
+
+        // Classifica status
+        const sNorm = r.status.toLowerCase();
+        if(sNorm.includes('ativa')) acc.cntAtiva++;
+        else if(sNorm.includes('cortada')) acc.cntCortada++;
+        else if(sNorm.includes('pedido') || sNorm.includes('pedida')) acc.cntPedido++;
+        else acc.cntOutros++;
+      }
+
+      const pFrac=p/100;
+      totalLossBase = 0;
+      for(const [z, rec] of byZone.entries()){
+        const sivBase   = rec.micBase/(1-pFrac);
+        const lossBase  = sivBase - rec.micBase;
+        totalLossBase += lossBase;
+
+        batchAgg.push({
+          zona: z, 
+          itens: rec.itens, // Total de ligações
+          
+          // Contagens detalhadas para a tabela de stats
+          cntAtiva: rec.cntAtiva,
+          cntCortada: rec.cntCortada,
+          cntPedido: rec.cntPedido,
+          cntOutros: rec.cntOutros,
+
+          micBase: rec.micBase,                          // micromedido (base)
+          lossBase: lossBase,                             // perdas (base)
+          sivBase:  sivBase,                              // siv (base)
+          pEff: (lossBase/(rec.micBase+lossBase))*100,    // % perdas efetivo
+          partLoss: 0,                                    // participação %
+          locked:false,
+          pReal: pr, pApar: pa,
+          unit: commonUnit // Unidade para exibição na tabela
+        });
+      }
+
+      // part. inicial
+      batchAgg.forEach(r=>{ r.partLoss = totalLossBase>0 ? (r.lossBase/totalLossBase*100) : 0; });
+      initialShares = batchAgg.map(r=>r.partLoss);
+
+      // ordena por nome
+      batchAgg.sort((a,b)=> a.zona.localeCompare(b.zona, 'pt'));
+
+      renderAggTable();
+      drawPies();
+      renderStatsTable(); 
+    }
+
+    function showBatchError(msg){ batchErr.style.display='block'; batchErr.textContent=msg; }
+    function clearBatchError(){ batchErr.style.display='none'; batchErr.textContent=''; }
+
+    // Render tabela principal de perdas
+    function renderAggTable(){
+      aggBody.innerHTML = '';
+      for(let i=0;i<batchAgg.length;i++){
+        const r = batchAgg[i];
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="w-setor"><span class="tag">${escapeHtml(r.zona)}</span></td>
+          <td class="right w-num">${r.itens}</td>
+          <td class="right w-num">${fmtQty(fromBase(r.micBase, r.unit))} ${fmtUnit(r.unit)}</td>
+
+          <td class="w-pct col-pEff center-pct">
+            <div class="pct-wrap center">
+              <input class="cell-pEff" type="number" min="0" max="99.9999" step="0.01" data-idx="${i}" value="${clamp(r.pEff,0,99.9999).toFixed(2)}" ${r.locked?'disabled':''}/>
+              <span class="unit-suf">%</span>
+            </div>
+          </td>
+
+          <td class="right w-num" data-k="siv">${fmtQty(fromBase(r.sivBase, r.unit))} ${fmtUnit(r.unit)}</td>
+          <td class="right w-num" data-k="loss">${fmtQty(fromBase(r.lossBase, r.unit))} ${fmtUnit(r.unit)}</td>
+
+          <td class="right w-pct" data-k="share">${fmtPct(r.partLoss)}</td>
+
+          <td class="lock-wrap"><input type="checkbox" class="cell-lock" data-idx="${i}" ${r.locked?'checked':''} /></td>
+
+          <td class="right w-pct">
+            <div class="pct-wrap">
+              <input class="cell-pct" type="number" min="0" max="100" step="0.01" data-idx="${i}" data-role="real" value="${r.pReal.toFixed(2)}" />
+              <span class="unit-suf">%</span>
+            </div>
+          </td>
+          <td class="right w-pct">
+            <div class="pct-wrap">
+              <input class="cell-pct" type="number" min="0" max="100" step="0.01" data-idx="${i}" data-role="apar" value="${r.pApar.toFixed(2)}" />
+              <span class="unit-suf">%</span>
+            </div>
+          </td>
+
+          <td class="right w-num" data-k="lossReal">${fmtQty(fromBase(r.lossBase*(r.pReal/100), r.unit))} ${fmtUnit(r.unit)}</td>
+          <td class="right w-num" data-k="lossApar">${fmtQty(fromBase(r.lossBase*(r.pApar/100), r.unit))} ${fmtUnit(r.unit)}</td>
+        `;
+        aggBody.appendChild(tr);
+      }
+      renderTotalsOnly();
+    }
+
+    // Renderiza a tabela de médias (Com suporte a unidades variadas e status)
+    function renderStatsTable(){
+        const tb = document.getElementById('statsBody');
+        tb.innerHTML = '';
+        
+        // Atualiza cabeçalho
+        const unitSel = statsUnitSel.value;
+        let unitLabel = '';
+        if(unitSel === 'm3m') unitLabel = 'm³/mês';
+        else if(unitSel === 'ls') unitLabel = 'L/s';
+        else unitLabel = 'm³/h';
+        
+        document.getElementById('colMeanHeader').innerHTML = `Média (Só Ativas)<br><small>(${unitLabel})</small>`;
+
+        if(!batchAgg.length) {
+            tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:12px">Nenhum dado processado ainda.</td></tr>';
+            return;
+        }
+
+        let tItens = 0, tAtiva = 0, tCortada = 0, tPedido = 0, tOutros = 0;
+        let tMicBase = 0; // Totais na base (m3h)
+
+        batchAgg.forEach(r => {
+            // Demanda total da zona (converte para a unidade geral do lote para exibição)
+            const micValDisplay = fromBase(r.micBase, r.unit);
+            
+            // Cálculo da média na unidade selecionada (específica), baseada APENAS NAS ATIVAS
+            const activeCount = r.cntAtiva;
+            const baseAvg = activeCount > 0 ? (r.micBase / activeCount) : 0; // m3/h por ligação ativa
+            
+            let finalAvg = 0;
+            if(unitSel === 'm3m') finalAvg = baseAvg * 720; 
+            else if (unitSel === 'ls') finalAvg = baseAvg / 3.6;
+            else finalAvg = baseAvg;
+
+            // Acumula totais gerais
+            tItens += r.itens;
+            tAtiva += r.cntAtiva;
+            tCortada += r.cntCortada;
+            tPedido += r.cntPedido;
+            tOutros += r.cntOutros;
+            tMicBase += r.micBase;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="w-setor"><span class="tag">${escapeHtml(r.zona)}</span></td>
+                <td class="right w-num">${r.itens}</td>
+                <td class="right w-num" style="color:#14532d; background:#f0fdf4">${r.cntAtiva}</td>
+                <td class="right w-num" style="color:#7f1d1d; background:#fef2f2">${r.cntCortada}</td>
+                <td class="right w-num" style="color:#7c2d12; background:#fff7ed">${r.cntPedido}</td>
+                <td class="right w-num" style="color:#555">${r.cntOutros}</td>
+                <td class="right w-num">${fmtQty(micValDisplay)} ${fmtUnit(r.unit)}</td>
+                <td class="right w-num" style="font-weight:700; color:var(--text-2)">${fmtQty(finalAvg)}</td>
+            `;
+            tb.appendChild(tr);
+        });
+
+        // Totais Gerais
+        const baseAvgTotal = tAtiva > 0 ? (tMicBase / tAtiva) : 0;
+        let finalAvgTotal = 0;
+        if(unitSel === 'm3m') finalAvgTotal = baseAvgTotal * 720;
+        else if (unitSel === 'ls') finalAvgTotal = baseAvgTotal / 3.6;
+        else finalAvgTotal = baseAvgTotal;
+
+        // Total exibido na unidade do lote
+        const tMicDisplay = fromBase(tMicBase, batchAgg[0].unit);
+
+        const trTot = document.createElement('tr');
+        trTot.style.background = '#e7fbfb';
+        trTot.innerHTML = `
+            <td class="w-setor"><b>TOTAL GERAL</b></td>
+            <td class="right w-num"><b>${tItens}</b></td>
+            <td class="right w-num"><b>${tAtiva}</b></td>
+            <td class="right w-num"><b>${tCortada}</b></td>
+            <td class="right w-num"><b>${tPedido}</b></td>
+            <td class="right w-num"><b>${tOutros}</b></td>
+            <td class="right w-num"><b>${fmtQty(tMicDisplay)} ${fmtUnit(batchAgg[0].unit)}</b></td>
+            <td class="right w-num"><b>${fmtQty(finalAvgTotal)}</b></td>
+        `;
+        tb.appendChild(trTot);
+    }
+    
+    // Ouvinte para mudar a unidade da estatística
+    statsUnitSel.addEventListener('change', renderStatsTable);
+
+    function renderTotalsOnly(){
+      const rows = aggBody.querySelectorAll('tr');
+      if(rows.length){
+        const last = rows[rows.length-1];
+        if(last && last.querySelector('td') && last.querySelector('td').textContent.includes('TOTAL')){
+          aggBody.removeChild(last);
+        }
+      }
+      if(!batchAgg.length) return;
+
+      const unitLab = batchAgg[0].unit;
+      const tot = batchAgg.reduce((t,r)=>({
+        itens:t.itens+r.itens,
+        mic: t.mic + r.micBase,
+        siv: t.siv + r.sivBase,
+        loss:t.loss + r.lossBase,
+        real:t.real + r.lossBase*(r.pReal/100),
+        apar:t.apar + r.lossBase*(r.pApar/100),
+        share:t.share + r.partLoss
+      }),{itens:0, mic:0, siv:0, loss:0, real:0, apar:0, share:0});
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="w-setor"><b>TOTAL</b></td>
+        <td class="right w-num"><b>${tot.itens}</b></td>
+        <td class="right w-num"><b>${fmtQty(fromBase(tot.mic, unitLab))} ${fmtUnit(unitLab)}</b></td>
+        <td class="right w-pct"><b>—</b></td>
+        <td class="right w-num"><b>${fmtQty(fromBase(tot.siv, unitLab))} ${fmtUnit(unitLab)}</b></td>
+        <td class="right w-num"><b>${fmtQty(fromBase(tot.loss, unitLab))} ${fmtUnit(unitLab)}</b></td>
+        <td class="right w-pct"><b>${fmtPct(tot.share)}</b></td>
+        <td class="lock-wrap">—</td>
+        <td class="right w-pct"><b>—</b></td>
+        <td class="right w-pct"><b>—</b></td>
+        <td class="right w-num"><b>${fmtQty(fromBase(tot.real, unitLab))} ${fmtUnit(unitLab)}</b></td>
+        <td class="right w-num"><b>${fmtQty(fromBase(tot.apar, unitLab))} ${fmtUnit(unitLab)}</b></td>
+      `;
+      aggBody.appendChild(tr);
+    }
+
+    // Recalcula campos derivados e atualiza UI de uma linha
+    function updateRowUI(i){
+      const r = batchAgg[i];
+      const row = aggBody.querySelectorAll('tr')[i];
+      if(!row) return;
+      row.querySelector('td[data-k="siv"]').textContent  = `${fmtQty(fromBase(r.sivBase, r.unit))} ${fmtUnit(r.unit)}`;
+      row.querySelector('td[data-k="loss"]').textContent = `${fmtQty(fromBase(r.lossBase, r.unit))} ${fmtUnit(r.unit)}`;
+      row.querySelector('td[data-k="share"]').textContent= fmtPct(r.partLoss);
+      row.querySelector('td[data-k="lossReal"]').textContent = `${fmtQty(fromBase(r.lossBase*(r.pReal/100), r.unit))} ${fmtUnit(r.unit)}`;
+      row.querySelector('td[data-k="lossApar"]').textContent = `${fmtQty(fromBase(r.lossBase*(r.pApar/100), r.unit))} ${fmtUnit(r.unit)}`;
+    }
+
+    // Dado pEff, calcula perda base alvo para a zona
+    function lossBaseFromPEff(micBase, pEff){
+      const p = clamp(pEff, 0, 99.9999)/100;
+      return micBase * p / (1-p); // perda = mic * p/(1-p)
+    }
+
+    // Redistribui mantendo totalLossBase; respeita locked
+    function redistributeAfterEdit(editedIndex){
+      // 1) soma perdas fixas (zonas locked + a editada)
+      let sumFixed = 0;
+      const locked = [];
+      const unlocked = [];
+      for(let i=0;i<batchAgg.length;i++){
+        if(batchAgg[i].locked || i===editedIndex){
+          locked.push(i);
+          sumFixed += batchAgg[i].lossBase;
+        }else{
+          unlocked.push(i);
+        }
+      }
+      // 2) saldo a distribuir
+      let rem = totalLossBase - sumFixed;
+
+      if(rem < -1e-9){
+        // Valor editado inviável — limitar a perda da editada ao máximo possível
+        const othersLocked = locked.filter(i=>i!==editedIndex).reduce((s,i)=>s+batchAgg[i].lossBase,0);
+        const maxLossEdited = Math.max(0, totalLossBase - othersLocked);
+        if(editedIndex!==null && editedIndex!==undefined){
+          batchAgg[editedIndex].lossBase = maxLossEdited;
+          // Atualiza pEff da editada conforme limite e sincroniza input
+          const r = batchAgg[editedIndex];
+          r.pEff = (r.lossBase/(r.micBase + r.lossBase))*100;
+          const inp = aggBody.querySelector(`input.cell-pEff[data-idx="${editedIndex}"]`);
+          if(inp) inp.value = r.pEff.toFixed(2);
+        }
+        // Recalcular rem
+        sumFixed = othersLocked + (editedIndex!=null ? batchAgg[editedIndex].lossBase : 0);
+        rem = totalLossBase - sumFixed;
+        showBatchError('⚠ O valor informado excedia o total de perdas disponível. Limitado ao máximo possível.');
+      }else{
+        clearBatchError();
+      }
+
+      // 3) redistribuir entre desbloqueadas
+      if(unlocked.length>0){
+        const sumCurrUnlocked = unlocked.reduce((s,i)=> s + batchAgg[i].lossBase, 0);
+        if(sumCurrUnlocked>0){
+          const ratio = rem / sumCurrUnlocked;
+          unlocked.forEach(i=>{
+            batchAgg[i].lossBase = Math.max(0, batchAgg[i].lossBase * ratio);
+          });
+        }else{
+          const each = rem / unlocked.length;
+          unlocked.forEach(i=>{ batchAgg[i].lossBase = Math.max(0, each); });
+        }
+      }else{
+        // ninguém pra receber — se sobrou rem>0, distribui proporcionalmente entre travadas
+        if(rem > 1e-9){
+          const sumCurrLocked = locked.reduce((s,i)=> s + batchAgg[i].lossBase, 0);
+          locked.forEach(i=>{
+            const r = batchAgg[i];
+            r.lossBase += rem * (sumCurrLocked>0 ? r.lossBase/sumCurrLocked : 1/locked.length);
+          });
+        }
+      }
+
+      // 4) Atualiza SIV, pEff, partLoss, real/apar e UI de todas as linhas
+      for(let i=0;i<batchAgg.length;i++){
+        const r = batchAgg[i];
+        r.sivBase = r.micBase + r.lossBase;
+        r.pEff    = (r.lossBase/(r.micBase + r.lossBase))*100;
+      }
+      // partLoss (%) de acordo com as perdas novas
+      for(let i=0;i<batchAgg.length;i++){
+        batchAgg[i].partLoss = totalLossBase>0 ? (batchAgg[i].lossBase/totalLossBase*100) : 0;
+        updateRowUI(i);
+        const inp = aggBody.querySelector(`input.cell-pEff[data-idx="${i}"]`);
+        if(inp && !batchAgg[i].locked){
+          inp.value = clamp(batchAgg[i].pEff,0,99.9999).toFixed(2);
+        }
+      }
+      renderTotalsOnly();
+      drawPies();
+    }
+
+    // Edição de % Perdas (efet.)
+    aggBody.addEventListener('input', (ev)=>{
+      const el = ev.target;
+      if(el.classList.contains('cell-pEff')){
+        clearBatchError();
+        const idx = Number.parseInt(el.dataset.idx,10);
+        if(!(idx>=0 && idx<batchAgg.length)) return;
+        if(batchAgg[idx].locked){ // input vem desabilitado, mas garantimos
+          el.value = batchAgg[idx].pEff.toFixed(2);
+          return;
+        }
+        // valor informado
+        let pEff = Number.parseFloat(el.value);
+        if(!isFinite(pEff)) pEff = 0;
+        pEff = clamp(pEff, 0, 99.9999);
+
+        // calcula a nova perda base da editada
+        const r = batchAgg[idx];
+        r.pEff = pEff;
+        r.lossBase = lossBaseFromPEff(r.micBase, pEff);
+
+        // Redistribui mantendo o total e respeitando travas
+        redistributeAfterEdit(idx);
+      }
+
+      // % Reais/Aparentes por zona
+      if(el.classList.contains('cell-pct')){
+        const idx = Number.parseInt(el.dataset.idx,10);
+        const role= el.dataset.role;
+        if(!(idx>=0 && idx<batchAgg.length)) return;
+
+        let val = Number.parseFloat(el.value); if(!isFinite(val)) val=0;
+        val = clamp(val,0,100);
+        if(role==='real'){
+          batchAgg[idx].pReal = val;
+          batchAgg[idx].pApar = 100 - val;
+          const aparInp = aggBody.querySelector(`input.cell-pct[data-idx="${idx}"][data-role="apar"]`);
+          if(aparInp) aparInp.value = batchAgg[idx].pApar.toFixed(2);
+        }else{
+          batchAgg[idx].pApar = val;
+          batchAgg[idx].pReal = 100 - val;
+          const realInp = aggBody.querySelector(`input.cell-pct[data-idx="${idx}"][data-role="real"]`);
+          if(realInp) realInp.value = batchAgg[idx].pReal.toFixed(2);
+        }
+        updateRowUI(idx);
+        renderTotalsOnly();
+        drawPies();
+      }
+    });
+
+    // Trava/destrava zona
+    aggBody.addEventListener('change', (ev)=>{
+      const el = ev.target;
+      if(el.classList.contains('cell-lock')){
+        const idx = Number.parseInt(el.dataset.idx,10);
+        const checked = !!el.checked;
+        batchAgg[idx].locked = checked;
+        const pEffInp = aggBody.querySelector(`input.cell-pEff[data-idx="${idx}"]`);
+        if(pEffInp) pEffInp.disabled = checked;
+        redistributeAfterEdit(null); // normaliza mantendo total
+      }
+    });
+
+    // Equalizar desbloqueadas (mantendo travadas)
+    document.getElementById('btnEqualizar').addEventListener('click', ()=>{
+      if(!batchAgg.length) return;
+      const lockedIdx = batchAgg.map((r,i)=>r.locked?i:-1).filter(i=>i>=0);
+      const unlockedIdx = batchAgg.map((r,i)=>!r.locked?i:-1).filter(i=>i>=0);
+      const sumLocked = lockedIdx.reduce((s,i)=> s + batchAgg[i].lossBase, 0);
+      const rem = Math.max(0, totalLossBase - sumLocked);
+      if(unlockedIdx.length===0){ redistributeAfterEdit(null); return; }
+      const each = rem / unlockedIdx.length;
+      unlockedIdx.forEach(i=>{
+        const r = batchAgg[i];
+        r.lossBase = each;
+        r.sivBase  = r.micBase + r.lossBase;
+        r.pEff     = (r.lossBase/(r.micBase+r.lossBase))*100;
+      });
+      batchAgg.forEach(r=> r.partLoss = totalLossBase>0 ? (r.lossBase/totalLossBase*100) : 0);
+      batchAgg.forEach((_,i)=>{
+        const inp = aggBody.querySelector(`input.cell-pEff[data-idx="${i}"]`);
+        if(inp && !batchAgg[i].locked) inp.value = batchAgg[i].pEff.toFixed(2);
+        updateRowUI(i);
+      });
+      renderTotalsOnly(); drawPies();
+    });
+
+    // Travar todos / Destravar todos
+    document.getElementById('btnLockAll').addEventListener('click', ()=>{
+      batchAgg.forEach(r=> r.locked = true);
+      aggBody.querySelectorAll('input.cell-lock').forEach(cb=> cb.checked = true);
+      aggBody.querySelectorAll('input.cell-pEff').forEach(inp=> inp.disabled = true);
+      redistributeAfterEdit(null);
+    });
+    document.getElementById('btnUnlockAll').addEventListener('click', ()=>{
+      batchAgg.forEach(r=> r.locked = false);
+      aggBody.querySelectorAll('input.cell-lock').forEach(cb=> cb.checked = false);
+      aggBody.querySelectorAll('input.cell-pEff').forEach(inp=> inp.disabled = false);
+      redistributeAfterEdit(null);
+    });
+
+    // Resetar participações
+    document.getElementById('btnResetShares').addEventListener('click', ()=>{
+      if(!batchAgg.length) return;
+      for(let i=0;i<batchAgg.length;i++){
+        const r = batchAgg[i];
+        const part = initialShares[i] ?? (100/batchAgg.length);
+        r.lossBase = totalLossBase * (part/100);
+        r.sivBase  = r.micBase + r.lossBase;
+        r.pEff     = (r.lossBase/(r.micBase+r.lossBase))*100;
+        r.partLoss = part;
+        r.locked   = false;
+        const lockCb = aggBody.querySelector(`input.cell-lock[data-idx="${i}"]`);
+        if(lockCb) lockCb.checked = false;
+      }
+      batchAgg.forEach((_,i)=>{
+        const inp = aggBody.querySelector(`input.cell-pEff[data-idx="${i}"]`);
+        if(inp){ inp.disabled=false; inp.value = batchAgg[i].pEff.toFixed(2); }
+        updateRowUI(i);
+      });
+      renderTotalsOnly(); drawPies(); clearBatchError();
+    });
+
+    // ======= Gráficos (cores variadas) =======
+    let zoneColors = new Map();
+    function getColorForZone(z, idx){
+      if(zoneColors.has(z)) return zoneColors.get(z);
+      const hue = 170 + (idx * 23) % 70;  // 170..240
+      const sat = 55 + (idx * 9) % 35;    // 55..90
+      const lig = 40 + (idx * 7) % 25;    // 40..65
+      const color = `hsl(${hue} ${sat}% ${lig}%)`;
+      zoneColors.set(z, color);
+      return color;
+    }
+    function clearCharts(){
+      [pieReal,pieApar,pieTot].forEach(cv=>{ if(cv){ const c=cv.getContext('2d'); c.clearRect(0,0,cv.width,cv.height);} });
+      [legReal,legApar,legTot].forEach(l=>{ if(l) l.innerHTML=''; });
+      zoneColors.clear();
+    }
+    function drawPie(canvas, values, labels, colors, unitLabel){
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+      const cx = W/2, cy = H/2, r = Math.min(W,H)*0.38;
+      const total = values.reduce((a,b)=>a+b,0);
+      if(total<=0){
+        ctx.fillStyle = '#666'; ctx.font='14px system-ui'; ctx.textAlign='center'; ctx.fillText('Sem dados', cx, cy);
+        return;
+      }
+      let ang = -Math.PI/2;
+      values.forEach((v,i)=>{
+        const frac = v/total;
+        const a2 = ang + frac * Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,ang,a2); ctx.closePath();
+        ctx.fillStyle = colors[i]; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+        ang = a2;
+      });
+      // Centro branco e Texto
+      ctx.beginPath(); ctx.fillStyle='#fff'; ctx.arc(cx,cy,r*0.56,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#0a2340'; 
+      ctx.font='bold 16px system-ui'; ctx.textAlign='center';
+      
+      const valStr = total.toFixed(2);
+      ctx.fillText(valStr, cx, cy - 2);
+      
+      // Unidade abaixo do valor
+      if(unitLabel){
+        ctx.font='normal 12px system-ui'; ctx.fillStyle='#315a92';
+        ctx.fillText(fmtUnit(unitLabel), cx, cy + 14);
+      }
+    }
+    function buildLegend(container, labels, colors, values){
+      container.innerHTML='';
+      const total = values.reduce((a,b)=>a+b,0) || 1;
+      labels.forEach((lab,i)=>{
+        const item = document.createElement('div');
+        item.className='leg-item';
+        const pct = ((values[i]/total)*100).toFixed(1);
+        item.innerHTML = `<span class="swatch" style="background:${colors[i]}"></span><span>${escapeHtml(lab)} — ${pct}%</span>`;
+        container.appendChild(item);
+      });
+    }
+    function drawPies(){
+      if(!batchAgg.length) { clearCharts(); return; }
+      const labels = batchAgg.map(r=>r.zona);
+      const colrs  = labels.map((z,i)=>getColorForZone(z,i));
+      // Usa commonUnit (unidade de saída)
+      const u = commonUnit;
+      const valsReal = batchAgg.map(r=>Math.max(0, fromBase(r.lossBase*(r.pReal/100), u)));
+      const valsApar = batchAgg.map(r=>Math.max(0, fromBase(r.lossBase*(r.pApar/100), u)));
+      const valsTot  = batchAgg.map(r=>Math.max(0, fromBase(r.lossBase, u)));
+      
+      // Passamos a unidade para a função de desenho
+      drawPie(pieReal, valsReal, labels, colrs, u);
+      drawPie(pieApar, valsApar, labels, colrs, u);
+      drawPie(pieTot , valsTot , labels, colrs, u);
+      
+      buildLegend(legReal, labels, colrs, valsReal);
+      buildLegend(legApar, labels, colrs, valsApar);
+      buildLegend(legTot , labels, colrs, valsTot);
+    }
+
+    // ===== Relatório (A4) =====
+    function cloneAggTableForReport(){
+      const tbl = document.getElementById('tblAgg');
+      const clone = tbl.cloneNode(true);
+
+      // Converte inputs para texto fixo (%)
+      clone.querySelectorAll('input.cell-pEff, input.cell-pct, input.cell-lock').forEach(inp=>{
+        const td = inp.closest('td');
+        if(!td) return;
+        if(inp.classList.contains('cell-lock')){
+          td.textContent = inp.checked ? '🔒' : '—';
+        }else{
+          let val = Number.parseFloat(inp.value); if(!isFinite(val)) val=0;
+          td.innerHTML = `<div style="text-align:right; font-variant-numeric:tabular-nums">${val.toFixed(2)}%</div>`;
+        }
+      });
+
+      clone.style.fontSize = '.86rem';
+      clone.querySelectorAll('th,td').forEach(el=>{
+        el.style.padding = '6px';
+        el.style.whiteSpace = 'nowrap';
+      });
+      return clone;
+    }
+    function fitReportTable(){
+      const vp = document.getElementById('rp1Viewport');
+      const content = document.getElementById('rp1Content');
+      content.style.transform = 'scale(1)';
+      const cw = content.scrollWidth, ch = content.scrollHeight;
+      const vw = vp.clientWidth,  vh = vp.clientHeight;
+      const scale = Math.min(vw / cw, vh / ch, 1);
+      content.style.transform = `scale(${scale})`;
+    }
+    function canvasToImgDataURL(canvas){ try{ return canvas.toDataURL('image/png'); }catch(e){ return ''; } }
+    function buildReport(){
+      if(!batchAgg.length){ alert('Nada processado. Gere a tabela primeiro.'); return false; }
+      const now = new Date();
+      const meta = [
+        `<b>Data/Hora:</b> ${now.toLocaleString()}`,
+        `<b>Unidade:</b> ${fmtUnit(commonUnit)}`
+      ].join(' &nbsp; | &nbsp; ');
+      document.getElementById('rp1Meta').innerHTML = meta;
+      document.getElementById('rp2Meta').innerHTML = meta;
+      document.getElementById('rp3Meta').innerHTML = meta;
+
+      // Página 1
+      const container = document.getElementById('rp1Content');
+      container.innerHTML = '';
+      container.appendChild(cloneAggTableForReport());
+      fitReportTable();
+
+      // Página 2 — gráficos e estatísticas
+      document.getElementById('imgReal').src = canvasToImgDataURL(pieReal);
+      document.getElementById('imgApar').src = canvasToImgDataURL(pieApar);
+      document.getElementById('imgTot').src  = canvasToImgDataURL(pieTot);
+      
+      // Clone da tabela de stats para o relatório
+      document.getElementById('colMeanHeaderReport').innerHTML = document.getElementById('colMeanHeader').innerHTML;
+      const statsOrig = document.getElementById('statsBody');
+      const statsDest = document.getElementById('statsReportBody');
+      statsDest.innerHTML = statsOrig.innerHTML;
+
+      return true;
+    }
+    window.addEventListener('resize', ()=>{ if(printRoot.style.display === 'block'){ fitReportTable(); } });
+    document.getElementById('btnRelatorio').addEventListener('click', ()=>{
+      if(!buildReport()) return;
+      printRoot.style.display = 'block';
+      setTimeout(()=>window.print(), 60);
+      setTimeout(()=>{ printRoot.style.display = 'none'; }, 500);
+    });
+
+    // Botões principais
+    document.getElementById('btnProcessar').addEventListener('click', processBatch);
+    document.getElementById('btnLimpar').addEventListener('click', ()=>{
+      pasteBox.value=''; aggBody.innerHTML=''; batchAgg=[]; batchDet=[]; clearCharts(); clearBatchError();
+      renderStatsTable();
+    });
+
+    // Exportações
+    document.getElementById('btnExportAgg').addEventListener('click', ()=>{
+      if(batchAgg.length===0){ alert('Nada para exportar. Clique em Processar primeiro.'); return; }
+      const sep=';';
+      const header=[
+        'Zona','Itens',
+        `DemandaSoma(${fmtUnit(commonUnit)})`,
+        'PercentualPerdasEfetivo(%)',
+        `SIV(${fmtUnit(commonUnit)})`,
+        `PerdasTotais(${fmtUnit(commonUnit)})`,
+        'ParticipacaoPerdas(%)',
+        'Trava',
+        'PercentualReais(%)','PercentualAparentes(%)',
+        `PerdasReais(${fmtUnit(commonUnit)})`,
+        `PerdasAparentes(${fmtUnit(commonUnit)})`
+      ];
+      const lines=[header.join(sep)];
+      batchAgg.forEach(r=>{
+        lines.push([
+          r.zona.replace(/;/g,','), r.itens,
+          fmtQty(fromBase(r.micBase, r.unit)).replace('.',','),
+          (r.pEff).toFixed(2).replace('.',','),
+          fmtQty(fromBase(r.sivBase, r.unit)).replace('.',','),
+          fmtQty(fromBase(r.lossBase, r.unit)).replace('.',','),
+          r.partLoss.toFixed(2).replace('.',','),
+          r.locked?'Sim':'Não',
+          r.pReal.toFixed(2).replace('.',','), r.pApar.toFixed(2).replace('.',','),
+          fmtQty(fromBase(r.lossBase*(r.pReal/100), r.unit)).replace('.',','),
+          fmtQty(fromBase(r.lossBase*(r.pApar/100), r.unit)).replace('.',',')
+        ].join(sep));
+      });
+      const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=`lote_zonas_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
+
+    document.getElementById('btnExportDet').addEventListener('click', ()=>{
+      if(batchDet.length===0){ alert('Nada para exportar. Clique em Processar primeiro.'); return; }
+      const sep=';'; const header=['Label','Zona','Unidade','DemandaMicromedido','Status'];
+      const lines=[header.join(sep)];
+      batchDet.forEach(r=>{
+        lines.push([ 
+            `"${String(r.label).replace(/"/g,'""')}"`, 
+            `"${String(r.zona).replace(/"/g,'""')}"`, 
+            r.unidade, 
+            String(r.mic).replace('.',','),
+            `"${String(r.status).replace(/"/g,'""')}"`
+        ].join(sep));
+      });
+      const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=`lote_detalhado_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
+
+    // Salvar/Carregar cenário
+    document.getElementById('btnSalvarCenario').addEventListener('click', ()=>{
+      if(!batchAgg.length){ alert('Nada para salvar. Clique em Processar primeiro.'); return; }
+      const data = {
+        version: 2,
+        commonUnit,
+        ipd: Number.parseFloat(batchLoss.value)||0,
+        defaultReal: Number.parseFloat(batchReal.value)||0,
+        defaultApar: Number.parseFloat(batchApar.value)||0,
+        totalLossBase,
+        zonas: batchAgg.map(r=>({
+          zona:r.zona, itens:r.itens, micBase:r.micBase,
+          pEff:r.pEff, partLoss:r.partLoss, locked:r.locked,
+          pReal:r.pReal, pApar:r.pApar,
+          cntAtiva:r.cntAtiva, cntCortada:r.cntCortada, cntPedido:r.cntPedido, cntOutros:r.cntOutros
+        }))
+      };
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json;charset=utf-8;'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cenario_perdas_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
+
+    document.getElementById('inpLoadCenario').addEventListener('change', async (ev)=>{
+      const file = ev.target.files && ev.target.files[0];
+      if(!file) return;
+      try{
+        const text = await file.text();
+        const data = JSON.parse(text);
+        commonUnit = data.commonUnit || 'm3h';
+        displayUnit.value = commonUnit; // Ajusta seletor ao carregar
+        
+        batchLoss.value = (data.ipd ?? 0);
+        batchReal.value = (data.defaultReal ?? 70);
+        batchApar.value = (data.defaultApar ?? 30);
+        totalLossBase   = (data.totalLossBase ?? 0);
+
+        batchAgg = (data.zonas||[]).map(z=>{
+          const micBase = z.micBase || 0;
+          const pEff = clamp(z.pEff ?? 0, 0, 99.9999);
+          const lossBase = micBase * (pEff/100) / (1 - pEff/100);
+          const sivBase  = micBase + lossBase;
+          return {
+            zona:z.zona, itens:z.itens||0, micBase,
+            lossBase, sivBase, pEff,
+            partLoss: totalLossBase>0 ? (lossBase/totalLossBase*100) : 0,
+            locked: !!z.locked, pReal: z.pReal ?? 70, pApar: z.pApar ?? 30,
+            unit: commonUnit,
+            // Recupera contagens salvas (se existirem)
+            cntAtiva: z.cntAtiva||0, cntCortada:z.cntCortada||0, cntPedido:z.cntPedido||0, cntOutros:z.cntOutros||0
+          }
+        });
+
+        initialShares = batchAgg.map(r=>r.partLoss);
+        renderAggTable();
+        drawPies();
+        renderStatsTable();
+        clearBatchError();
+      }catch(e){
+        showBatchError('Falha ao carregar o cenário. Verifique o arquivo .json.');
+      }finally{
+        ev.target.value = '';
+      }
+    });
+
+  </script>
+</body>
+</html>

@@ -1,186 +1,596 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Gestão Oeste</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Dashboard de Obras - Mapeamento de Propostas</title>
+    
+    <!-- Bibliotecas Externas -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+    
     <style>
         :root {
-            --primary-color: #4fc3f7; /* Azul claro */
-            --secondary-color: #1a2332; /* Azul escuro */
-            --background-color: #f0f2f5;
-            --card-bg: #ffffff;
-            --text-color: #1c1e21;
-            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --sidebar-bg: #1e2235;
+            --main-bg: #f4f7fe;
+            --primary: #4361ee;
+            --text-main: #2b3674;
+            --text-secondary: #a3aed0;
+            --white: #ffffff;
+            --shadow: 0px 4px 20px rgba(0, 0, 0, 0.05);
+            --success: #05cd99;
+            --gold: #ffb800;
+            --danger: #ee5d50;
+            --warning: #ffb81c;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', 'Segoe UI', sans-serif; background: var(--main-bg); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+        #app-container { display: flex; height: 100vh; }
+
+        /* Sidebar */
+        #sidebar { width: 240px; background: var(--sidebar-bg); color: white; padding: 25px 15px; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+        .logo { font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; color: var(--white); }
+        
+        .sidebar-section-title { font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 12px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #2a2f45; padding-bottom: 5px; }
+        
+        .sidebar-filter-group { margin-bottom: 20px; }
+        .sidebar-filter-group label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; font-weight: bold; }
+        .sidebar-filter-group select { width: 100%; padding: 10px; border-radius: 8px; border: none; background: #2a2f45; color: white; font-size: 0.85rem; outline: none; }
+        
+        .upload-group { margin-bottom: 15px; }
+        .upload-label { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px; background: #2a2f45; color: #fff; border-radius: 8px; cursor: pointer; font-size: 0.75rem; transition: background 0.3s; border: 1px dashed #4a5568; }
+        .upload-label:hover { background: #353b55; }
+        .upload-label.loaded { border-color: var(--success); color: var(--success); }
+        .upload-group input { display: none; }
+        
+        .btn-reset { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; margin-top: 10px; }
+
+        /* Main Content */
+        #main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 20px; gap: 20px; }
+
+        /* KPI Cards */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; flex-shrink: 0; }
+        .kpi-card { background: var(--white); padding: 20px; border-radius: 15px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; }
+        .kpi-info h4 { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; font-weight: 700; }
+        .kpi-info .value { font-size: 1.2rem; font-weight: 800; color: var(--text-main); }
+        
+        .kpi-icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .kpi-icon-wrapper i { font-size: 1.4rem !important; display: block !important; }
+        
+        .icon-capex { background: rgba(67, 97, 238, 0.1); color: var(--primary) !important; }
+        .icon-opex { background: rgba(5, 205, 153, 0.1); color: var(--success) !important; }
+        .icon-vaz { background: rgba(238, 93, 80, 0.1); color: var(--danger) !important; }
+        .icon-pressao { background: rgba(255, 184, 28, 0.1); color: var(--warning) !important; }
+
+        /* Middle Section */
+        .middle-section { display: flex; gap: 20px; flex: 1; min-height: 0; }
+        .map-card { background: var(--white); border-radius: 15px; box-shadow: var(--shadow); padding: 20px; display: flex; flex-direction: column; flex: 2; min-width: 0; position: relative; }
+        .right-column { display: flex; flex-direction: column; flex: 1; gap: 20px; min-width: 0; }
+        .table-card { background: var(--white); border-radius: 15px; box-shadow: var(--shadow); padding: 20px; display: flex; flex-direction: column; flex: 1.8; min-height: 0; }
+        .ranking-card { background: var(--white); border-radius: 15px; box-shadow: var(--shadow); padding: 20px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        
+        .card-title { font-size: 1rem; font-weight: bold; margin-bottom: 15px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
+        #map { flex: 1; border-radius: 10px; z-index: 1; width: 100%; background: #eee; }
+
+        /* Legenda do Mapa */
+        .map-legend {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            font-size: 0.75rem;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
+            gap: 8px;
+            border: 1px solid #f0f0f0;
         }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-main); }
+        .legend-color { width: 14px; height: 14px; border-radius: 3px; }
 
-        .header {
-            background-color: var(--secondary-color);
-            color: white;
-            width: 100%;
-            padding: 30px 20px;
-            text-align: center;
-            box-shadow: var(--shadow);
-            margin-bottom: 40px;
-        }
+        /* Table Styles */
+        .table-container { overflow: auto; flex: 1; margin-top: 5px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 450px; }
+        thead { position: sticky; top: 0; background: var(--white); z-index: 2; }
+        th { text-align: left; padding: 8px; color: var(--text-secondary); font-size: 0.6rem; text-transform: uppercase; border-bottom: 1px solid #f4f7fe; }
+        td { padding: 8px; font-size: 0.7rem; border-bottom: 1px solid #f4f7fe; }
+        tr { cursor: pointer; transition: background 0.2s; }
+        tr:hover { background: #f0f3ff; }
+        tr.active-row { background: #e0e7ff !important; }
+        .td-rank { font-weight: bold; color: var(--primary); width: 30px; text-align: center; }
 
-        .header h1 {
-            margin: 0;
-            font-size: 2.5em;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
+        /* Ranking Styles */
+        .ranking-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        .ranking-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: #f8faff; border-radius: 10px; transition: transform 0.2s; cursor: pointer; }
+        .ranking-item:hover { transform: translateX(5px); background: #f0f3ff; }
+        .rank-number { width: 24px; height: 24px; background: var(--text-secondary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; flex-shrink: 0; }
+        .ranking-item:nth-child(1) .rank-number { background: var(--gold); }
+        .ranking-item:nth-child(2) .rank-number { background: #c0c0c0; }
+        .ranking-item:nth-child(3) .rank-number { background: #cd7f32; }
+        .rank-info { flex: 1; min-width: 0; }
+        .rank-name { font-size: 0.75rem; font-weight: bold; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rank-city { font-size: 0.65rem; color: var(--text-secondary); }
+        .rank-value { font-size: 0.85rem; font-weight: bold; color: var(--primary); }
 
-        .header p {
-            margin: 5px 0 0 0;
-            font-size: 1.1em;
-            color: #a0aec0;
-        }
+        /* Tooltip Styles */
+        .leaflet-popup-content-wrapper { background: white !important; border: none !important; box-shadow: none !important; border-radius: 8px !important; }
+        .leaflet-popup-tip { box-shadow: none !important; }
+        .custom-tooltip { text-align: center; padding: 5px; min-width: 240px; font-family: 'DM Sans', sans-serif; }
+        .tooltip-header { font-size: 0.7rem; color: #888; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: center; gap: 10px; }
+        .tooltip-main-item { color: #1a4a7c; font-size: 1.2rem; font-weight: bold; margin-bottom: 4px; }
+        .tooltip-desc { font-size: 0.8rem; color: #666; margin-bottom: 12px; line-height: 1.3; }
+        .tooltip-highlight { font-size: 1.3rem; font-weight: bold; color: #1a4a7c; margin: 8px 0; }
+        .tooltip-label-mini { font-size: 0.65rem; font-weight: bold; color: #999; text-transform: uppercase; margin-bottom: 2px; }
+        .tooltip-row-inline { display: flex; justify-content: center; gap: 12px; font-size: 0.75rem; color: #444; margin-top: 10px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
+        .tooltip-item-box { display: flex; flex-direction: column; align-items: center; }
+        .tooltip-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0; border-top: 1px solid #f0f0f0; padding-top: 10px; }
+        .tooltip-footer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; border-top: 1px solid #f0f0f0; padding-top: 10px; font-size: 0.7rem; }
 
-        .container {
-            width: 90%;
-            max-width: 1200px;
-            padding: 20px;
-        }
-
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 30px;
-        }
-
-        .project-card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            padding: 30px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            text-decoration: none;
-            color: var(--text-color);
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            border-top: 5px solid var(--primary-color);
-        }
-
-        .project-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-icon {
-            font-size: 2.5em;
-            color: var(--primary-color);
-            margin-bottom: 15px;
-            background: #e0f7fa;
-            padding: 15px;
-            border-radius: 50%;
-        }
-
-        .project-card h2 {
-            font-size: 1.5em;
-            margin: 0 0 10px 0;
-            font-weight: 600;
-        }
-
-        .project-card p {
-            font-size: 0.95em;
-            color: #64748b;
-            margin: 0;
-        }
-
-        .card-link {
-            margin-top: 20px;
-            color: var(--primary-color);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-        }
-
-        .card-link i {
-            margin-left: 8px;
-            transition: margin-left 0.3s ease;
-        }
-
-        .project-card:hover .card-link i {
-            margin-left: 12px;
-        }
-
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 2em;
-            }
-            .card-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--white); display: flex; justify-content: center; align-items: center; z-index: 9999; flex-direction: column; gap: 15px; }
+        .spinner { width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .overlay-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 1000; background: rgba(255,255,255,0.9); padding: 20px; border-radius: 15px; box-shadow: var(--shadow); }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>Portal de Gestão Oeste</h1>
-        <p>Acesso rápido aos dashboards e análises de projetos</p>
+<div id="loading">
+    <div class="spinner"></div>
+    <p style="font-size: 0.9rem; color: var(--text-secondary);">Aguardando arquivos...</p>
+</div>
+
+<div id="app-container">
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="logo"><i class="fas fa-map-location-dot"></i> <span>Propostas Oeste</span></div>
+        
+        <div class="sidebar-section-title">Importar Dados</div>
+        
+        <div class="upload-group">
+            <label for="upload-excel" id="label-excel" class="upload-label">
+                <i class="fas fa-file-excel"></i> <span>Planilha Base (.xlsx)</span>
+            </label>
+            <input type="file" id="upload-excel" accept=".xlsx" />
+        </div>
+        
+        <div class="upload-group">
+            <label for="upload-ainf" id="label-ainf" class="upload-label">
+                <i class="fas fa-draw-polygon"></i> <span>GeoJSON AINF</span>
+            </label>
+            <input type="file" id="upload-ainf" accept=".geojson,.json" />
+        </div>
+        
+        <div class="upload-group">
+            <label for="upload-itens" id="label-itens" class="upload-label">
+                <i class="fas fa-map-pin"></i> <span>GeoJSON Itens</span>
+            </label>
+            <input type="file" id="upload-itens" accept=".geojson,.json" />
+        </div>
+
+        <div class="sidebar-section-title">Filtros</div>
+        
+        <div class="sidebar-filter-group">
+            <label>Município</label>
+            <select id="filter-cidade"><option value="">Todos</option></select>
+        </div>
+        <div class="sidebar-filter-group">
+            <label>Obra</label>
+            <select id="filter-obra"><option value="">Todas as Obras</option></select>
+        </div>
+        <button id="btn-reset" class="btn-reset">Limpar Filtros</button>
     </div>
 
-    <div class="container">
-        <div class="card-grid">
+    <!-- Main Content -->
+    <div id="main-content">
+        <div id="empty-state-msg" class="overlay-msg">
+            <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px; display: block;"></i>
+            <h3>Dashboard Pronto</h3>
+            <p style="color: var(--text-secondary); margin-top: 10px;">Por favor, carregue os arquivos na barra lateral para visualizar os dados.</p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h4>Investimento Total</h4>
+                    <div id="kpi-capex" class="value">R$ 0</div>
+                </div>
+                <div class="kpi-icon-wrapper icon-capex">
+                    <i class="fas fa-wallet"></i>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h4>Redução OPEX</h4>
+                    <div id="kpi-opex" class="value">R$ 0</div>
+                </div>
+                <div class="kpi-icon-wrapper icon-opex">
+                    <i class="fas fa-hand-holding-dollar"></i>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h4>Vazamentos Evitados</h4>
+                    <div id="kpi-vaz" class="value">0</div>
+                </div>
+                <div class="kpi-icon-wrapper icon-vaz">
+                    <i class="fas fa-faucet-drip"></i>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h4>Red. Pressão Média</h4>
+                    <div id="kpi-pressao" class="value">0 mca</div>
+                </div>
+                <div class="kpi-icon-wrapper icon-pressao">
+                    <i class="fas fa-gauge-high"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Section -->
+        <div class="middle-section">
+            <div class="map-card">
+                <div id="map-title" class="card-title">Mapeamento de Propostas</div>
+                <div id="map"></div>
+                
+                <!-- Legenda do Mapa -->
+                <div class="map-legend">
+                    <div class="legend-item"><div class="legend-color" style="background: #2240c7ff;"></div> VRP</div>
+                    <div class="legend-item"><div class="legend-color" style="background: #e24f4fff;"></div> Registro</div>
+                    <div class="legend-item"><div class="legend-color" style="background: #3feb39ff;"></div> Rede</div>
+                    <div class="legend-item"><div class="legend-color" style="background: #02c9ccff; opacity: 0.6; border: 1px solid #00ced1;"></div> Área de Influência</div>
+                </div>
+            </div>
             
-            <!-- 1. Propostas PGV -->
-            <a href="PropostasPGV.html" class="project-card">
-                <div class="card-icon"><i class="fas fa-map-marked-alt"></i></div>
-                <h2>Propostas PGV</h2>
-                <p>Análise de viabilidade técnica e financeira das Válvulas Redutoras de Pressão (VRPs) por zona e cidade.</p>
-                <span class="card-link">Acessar Dashboard <i class="fas fa-arrow-right"></i></span>
-            </a>
-
-            <!-- 2. Viabilidade -->
-            <a href="Viabilidade.html" class="project-card" style="border-top-color: #f59e0b;">
-                <div class="card-icon" style="color: #f59e0b; background: #fffbeb;"><i class="fas fa-chart-line"></i></div>
-                <h2>Viabilidade</h2>
-                <p>Estudos de viabilidade econômica e financeira de novos projetos de infraestrutura.</p>
-                <span class="card-link" style="color: #f59e0b;">Acessar Dashboard <i class="fas fa-arrow-right"></i></span>
-            </a>
-
-            <!-- 3. Perdas -->
-            <a href="Perdas.html" class="project-card" style="border-top-color: #ef4444;">
-                <div class="card-icon" style="color: #ef4444; background: #fee2e2;"><i class="fas fa-exclamation-triangle"></i></div>
-                <h2>Perdas</h2>
-                <p>Análise detalhada dos índices de perdas de água e estratégias de redução.</p>
-                <span class="card-link" style="color: #ef4444;">Acessar Dashboard <i class="fas fa-arrow-right"></i></span>
-            </a>
-
-            <!-- 4. Dados Múltiplos -->
-            <a href="DadosMultiplosCOI.html" class="project-card" style="border-top-color: #8b5cf6;">
-                <div class="card-icon" style="color: #8b5cf6; background: #ede9fe;"><i class="fas fa-database"></i></div>
-                <h2>Dados Múltiplos</h2>
-                <p>Visualização e cruzamento de dados de diversas fontes para análises complexas.</p>
-                <span class="card-link" style="color: #8b5cf6;">Acessar Dashboard <i class="fas fa-arrow-right"></i></span>
-            </a>
-
-            <!-- 5. Demanda Anual -->
-            <a href="DemandaAnual.html" class="project-card" style="border-top-color: #06b6d4;">
-                <div class="card-icon" style="color: #06b6d4; background: #cfecf2;"><i class="fas fa-calendar-alt"></i></div>
-                <h2>Demanda Anual</h2>
-                <p>Projeção e acompanhamento da demanda de água ao longo dos anos.</p>
-                <span class="card-link" style="color: #06b6d4;">Acessar Dashboard <i class="fas fa-arrow-right"></i></span>
-            </a>
-
+            <div class="right-column">
+                <div class="table-card">
+                    <div class="card-title"><i class="fas fa-sort-amount-down" style="color: var(--primary);"></i> Detalhamento por item</div>
+                    <div class="table-container">
+                        <table id="table-itens">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30px; text-align: center;">#</th>
+                                    <th>Item</th>
+                                    <th>Descrição</th>
+                                    <th>QNTD / UNID</th>
+                                    <th>DN/CV/M³</th>
+                                    <th>PU</th>
+                                    <th>Capex</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="ranking-card">
+                    <div class="card-title"><i class="fas fa-trophy" style="color: var(--gold);"></i> Top 5 Obras por TIR</div>
+                    <div id="ranking-list" class="ranking-list"></div>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
+<script>
+    const CITY_MAP = {
+        "ALECRIM": "Alecrim", "ALEGRETE": "Alegrete", "BARRA DO GUARITA": "Barra Do Guarita",
+        "BARRA DO QUARAI": "Barra do Quaraí", "BOA VISTA DO BURICA": "Boa Vista do Buricá",
+        "BOM PROGRESSO": "Bom Progressso", "BOSSOROCA": "Bossoroca", "BRAGA": "Braga",
+        "CACEQUI": "Cacequi", "CAIBATE": "Caibaté", "CAMPINA DAS MISSOES": "Campina das Missões",
+        "CAMPO NOVO": "Campo Novo", "CANDIDO GODOI": "Cândido Godói", "CERRO LARGO": "Cerro Largo",
+        "CHIAPETTA": "Chiapetta", "CORONEL BICACO": "Coronel Bicaco", "CRISSIUMAL": "Crissiumal",
+        "DERRUBADAS": "Derrubadas", "DOM PEDRITO": "Dom pedrito", "ENTRE IJUIS": "Entre-Ijuís",
+        "GIRUA": "Giruá", "GUARANI DAS MISSÕES": "Guarani das Missões", "HORIZONTINA": "Horizontina",
+        "HUMAITA": "Humaitá", "INDEPENDENCIA": "Independência", "INHACORA": "Inhacorá",
+        "ITAQUI": "Itaqui", "JAGUARI": "Jaguari", "MACAMBARA": "Maçambará", "MANOEL VIANA": "Manoel Viana",
+        "MAURICIO CARDOSO": "Dr. Maurício Cardoso", "MIRAGUAI": "Miraguaí", "NOVA ESPERANCA DO SUL": "Nova esperança do sul",
+        "PORTO LUCENA": "Porto Lucena", "PORTO XAVIER": "Porto Xavier", "QUARAI": "Quaraí",
+        "REDENTORA": "Redentora", "ROSARIO DO SUL": "Rosário do sul", "SANTA ROSA": "Santa Rosa",
+        "SANTIAGO": "Santiago", "SANTO ANGELO": "Santo Ângelo", "SANTO ANTONIO DAS MISSOES": "Santo Antônio das Missões",
+        "SANTO AUGUSTO": "Santo Augusto", "SANTO CRISTO": "Santo Cristo", "SAO BORJA": "São Borja",
+        "SAO FRANCISCO DE ASSIS": "São Francisco de Assis", "SAO JOSE DO INHACORA": "São José do Inhacorá",
+        "SAO LUIZ GONZAGA": "São Luiz Gonzaga", "SAO MARTINHO": "São Martinho", "SAO MIGUEL DAS MISSOES": "São Miguel das Missões",
+        "SAO NICOLAU": "São Nicolau", "SAO VICENTE DO SUL": "São vicente do sul", "SEDE NOVA": "Sede Nova",
+        "TENENTE PORTELA": "Tenente Portela", "TIRADENTES DO SUL": "Tiradentes do Sul", "TRES DE MAIO": "Três de Maio",
+        "TRES PASSOS": "Três Passos", "TUCUNDUVA": "Tucunduva", "TUPARENDI": "Tuparendi",
+        "UNISTALDA": "Unistalda", "VISTA GAUCHA": "Vista Gaúcha"
+    };
+
+    const CONFIG = {
+        colors: { 
+            vrp: '#0627bd',      // Azul
+            registro: '#c01919', // Vermelho
+            rede: '#07d100',     // Verde
+            ainf: '#00ced1'      // Ciano (Área de Influência)
+        }
+    };
+
+    const state = {
+        data: { obras: [], itensExcel: [], geoAinf: null, geoItens: null },
+        map: null,
+        layers: { ainf: L.featureGroup(), itens: L.featureGroup() },
+        filesLoaded: { excel: false, ainf: false, itens: false },
+        geoLayersMap: {} 
+    };
+
+    const normalizeCity = (n) => n ? (CITY_MAP[n.toUpperCase().trim()] || n) : "";
+    const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 }).format(v || 0);
+    const formatNum = (v) => new Intl.NumberFormat('pt-BR').format(v || 0);
+    const formatPct = (v) => ((v || 0) * 100).toFixed(1).replace('.', ',') + '%';
+
+    function initMap() {
+        state.map = L.map('map', { zoomControl: false }).setView([-29.79, -55.81], 12);
+        L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(state.map);
+        state.layers.ainf.addTo(state.map);
+        state.layers.itens.addTo(state.map);
+    }
+
+    function checkAllLoaded() {
+        if (state.filesLoaded.excel && state.filesLoaded.ainf && state.filesLoaded.itens) {
+            document.getElementById('empty-state-msg').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            populateFilters();
+            updateDashboard();
+        }
+    }
+
+    document.getElementById('upload-excel').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            state.data.obras = XLSX.utils.sheet_to_json(workbook.Sheets['OBRAS']);
+            state.data.itensExcel = XLSX.utils.sheet_to_json(workbook.Sheets['ITEM']);
+            state.filesLoaded.excel = true;
+            document.getElementById('label-excel').classList.add('loaded');
+            document.getElementById('label-excel').querySelector('span').textContent = "Excel Carregado";
+            checkAllLoaded();
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    document.getElementById('upload-ainf').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            state.data.geoAinf = JSON.parse(e.target.result);
+            state.filesLoaded.ainf = true;
+            document.getElementById('label-ainf').classList.add('loaded');
+            document.getElementById('label-ainf').querySelector('span').textContent = "GeoJSON AINF Carregado";
+            checkAllLoaded();
+        };
+        reader.readAsText(file);
+    });
+
+    document.getElementById('upload-itens').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            state.data.geoItens = JSON.parse(e.target.result);
+            state.filesLoaded.itens = true;
+            document.getElementById('label-itens').classList.add('loaded');
+            document.getElementById('label-itens').querySelector('span').textContent = "GeoJSON Itens Carregado";
+            checkAllLoaded();
+        };
+        reader.readAsText(file);
+    });
+
+    function populateFilters() {
+        const selCidade = document.getElementById('filter-cidade');
+        const cidades = [...new Set(state.data.obras.map(o => o.municipio))].map(c => ({raw: c, clean: normalizeCity(c)})).sort((a,b) => a.clean.localeCompare(b.clean));
+        selCidade.innerHTML = '<option value="">Todos</option>';
+        cidades.forEach(c => { 
+            const opt = document.createElement('option'); 
+            opt.value = c.raw; opt.textContent = c.clean; selCidade.appendChild(opt); 
+        });
+        updateObraFilter();
+    }
+
+    function updateObraFilter() {
+        const selObra = document.getElementById('filter-obra');
+        const cid = document.getElementById('filter-cidade').value;
+        selObra.innerHTML = '<option value="">Todas as Obras</option>';
+        state.data.obras.filter(o => !cid || o.municipio === cid).sort((a,b) => a.obra.localeCompare(b.obra)).forEach(o => {
+            const opt = document.createElement('option'); opt.value = o.obra; opt.textContent = o.obra; selObra.appendChild(opt);
+        });
+    }
+
+    function updateDashboard() {
+        if (!state.filesLoaded.excel) return;
+        const cid = document.getElementById('filter-cidade').value;
+        const obr = document.getElementById('filter-obra').value;
+        const mapTitle = document.getElementById('map-title');
+        if (obr) mapTitle.textContent = `Obra: ${obr}`;
+        else if (cid) mapTitle.textContent = `Propostas em ${normalizeCity(cid)}`;
+        else mapTitle.textContent = "Mapeamento de Propostas";
+
+        const obrasFiltradas = state.data.obras.filter(o => (!cid || o.municipio === cid) && (!obr || o.obra === obr));
+        const idsObras = obrasFiltradas.map(o => o.obra);
+        const itensFiltrados = state.data.itensExcel.filter(i => idsObras.includes(i.obra));
+        
+        updateKPIs(obrasFiltradas);
+        updateTable(itensFiltrados);
+        updateRanking(state.data.obras.filter(o => !cid || o.municipio === cid));
+        renderMap(idsObras);
+    }
+
+    function updateKPIs(obras) {
+        const capex = obras.reduce((a, b) => a + (b.capex || 0), 0);
+        const opex = obras.reduce((a, b) => a + (b['reducao_opex'] || 0), 0);
+        const vaz = obras.reduce((a, b) => a + (b['vaz-ano_evitado'] || 0), 0);
+        
+        const obrasComPressao = obras.filter(o => o['reducao_de_pressao-mca'] !== undefined && o['reducao_de_pressao-mca'] !== null && !isNaN(parseFloat(o['reducao_de_pressao-mca'])));
+        const pressaoMedia = obrasComPressao.length ? (obrasComPressao.reduce((a, b) => a + parseFloat(b['reducao_de_pressao-mca']), 0) / obrasComPressao.length) : 0;
+
+        document.getElementById('kpi-capex').textContent = formatBRL(capex);
+        document.getElementById('kpi-opex').textContent = formatBRL(opex);
+        document.getElementById('kpi-vaz').textContent = formatNum(vaz);
+        document.getElementById('kpi-pressao').textContent = pressaoMedia.toFixed(1).replace('.', ',') + ' mca';
+    }
+
+    function updateTable(itens) {
+        const tbody = document.querySelector('#table-itens tbody');
+        tbody.innerHTML = '';
+        const itensOrdenados = [...itens].sort((a, b) => (b.capex || 0) - (a.capex || 0));
+        itensOrdenados.forEach((i, index) => {
+            const tr = document.createElement('tr');
+            const unidFormatada = (i.unidade || '').toLowerCase() === 'unidade' ? 'und' : (i.unidade || 'und');
+            tr.innerHTML = `
+                <td class="td-rank">${index + 1}</td>
+                <td>${i.item || ''}</td>
+                <td>${i.descricao || ''}</td>
+                <td>${formatNum(i.quantidade)} ${unidFormatada}</td>
+                <td>${i.dn_cv_m3 || '-'}</td>
+                <td>${formatBRL(i.pu)}</td>
+                <td style="font-weight:bold; color:var(--text-main);">${formatBRL(i.capex)}</td>
+            `;
+            tr.onclick = () => {
+                document.querySelectorAll('#table-itens tr').forEach(r => r.classList.remove('active-row'));
+                tr.classList.add('active-row');
+                const layer = state.geoLayersMap[i.key_qgis];
+                if (layer) {
+                    if (layer.getBounds) state.map.flyToBounds(layer.getBounds(), { padding: [50, 50], duration: 1.5 });
+                    else if (layer.getLatLng) state.map.flyTo(layer.getLatLng(), 18, { duration: 1.5 });
+                    setTimeout(() => layer.openPopup(), 1600);
+                }
+            };
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateRanking(obras) {
+        const rankingList = document.getElementById('ranking-list');
+        rankingList.innerHTML = '';
+        const top5 = [...obras].sort((a, b) => (b.tir || 0) - (a.tir || 0)).slice(0, 5);
+        top5.forEach((obra, index) => {
+            const item = document.createElement('div');
+            item.className = 'ranking-item';
+            item.innerHTML = `
+                <div class="rank-number">${index + 1}</div>
+                <div class="rank-info">
+                    <div class="rank-name" title="${obra.obra}">${obra.obra}</div>
+                    <div class="rank-city">${normalizeCity(obra.municipio)}</div>
+                </div>
+                <div class="rank-value">${formatPct(obra.tir)}</div>
+            `;
+            item.onclick = () => {
+                document.getElementById('filter-cidade').value = obra.municipio;
+                updateObraFilter();
+                document.getElementById('filter-obra').value = obra.obra;
+                updateDashboard();
+            };
+            rankingList.appendChild(item);
+        });
+        if (top5.length === 0) rankingList.innerHTML = '<p style="text-align:center; color:var(--text-secondary); font-size:0.8rem; margin-top:20px;">Nenhum dado disponível</p>';
+    }
+
+    function getDimLabel(itemType) {
+        const t = (itemType || "").toLowerCase();
+        if (t.includes('booster')) return "CV";
+        if (t.includes('reservatório') || t.includes('reservatorio')) return "M³";
+        return "DN";
+    }
+
+    function renderMap(obrasVisiveis) {
+        if (!state.data.geoAinf || !state.data.geoItens) return;
+        state.layers.ainf.clearLayers();
+        state.layers.itens.clearLayers();
+        state.geoLayersMap = {}; 
+        L.geoJSON(state.data.geoAinf, {
+            filter: (f) => obrasVisiveis.includes(f.properties.obra),
+            style: { color: CONFIG.colors.ainf, weight: 1, opacity: 0.8, fillOpacity: 0.5 },
+            onEachFeature: (f, layer) => {
+                const obra = state.data.obras.find(o => o.obra === f.properties.obra);
+                if (obra) {
+                    layer.bindPopup(`
+                        <div class="custom-tooltip">
+                            <div class="tooltip-header"><span>${normalizeCity(obra.municipio)}</span> | <span>${obra.zona || ''}</span></div>
+                            <div class="tooltip-grid">
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">EXTENSÃO</div><div style="font-weight:bold;">${formatNum(Math.ceil(obra['extensao-m']))} m</div></div>
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">CAPEX</div><div style="font-weight:bold;">${formatBRL(obra.capex)}</div></div>
+                            </div>
+                            <div class="tooltip-footer-grid">
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">VAZ. EVITADOS/ANO</div><div>${formatNum(obra['vaz-ano_evitado'])}</div></div>
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">RED. PRESSÃO</div><div>${obra['reducao_de_pressao-mca'] || '-'}</div></div>
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">TIR</div><div>${formatPct(obra.tir)}</div></div>
+                            </div>
+                        </div>
+                    `);
+                }
+            }
+        }).addTo(state.layers.ainf);
+
+        L.geoJSON(state.data.geoItens, {
+            filter: (f) => obrasVisiveis.includes(f.properties.obra),
+            style: (f) => {
+                const t = (f.properties.item || "").toLowerCase();
+                const ln = (f.properties.layer_name || "").toLowerCase();
+                let color = CONFIG.colors.rede;
+                if (t.includes('vrp') || ln.includes('vrp')) color = CONFIG.colors.vrp;
+                else if (t.includes('registro') || ln.includes('isovalve') || ln.includes('tcv')) color = CONFIG.colors.registro;
+                return { color: color, weight: 5, opacity: 0.9 };
+            },
+            pointToLayer: (f, latlng) => {
+                const t = (f.properties.item || "").toLowerCase();
+                const ln = (f.properties.layer_name || "").toLowerCase();
+                let color = CONFIG.colors.rede;
+                if (t.includes('vrp') || ln.includes('vrp')) color = CONFIG.colors.vrp;
+                else if (t.includes('registro') || ln.includes('isovalve') || ln.includes('tcv')) color = CONFIG.colors.registro;
+                return L.circleMarker(latlng, { radius: 7, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 1 });
+            },
+            onEachFeature: (f, layer) => {
+                const item = state.data.itensExcel.find(i => i.key_qgis === f.properties.key_qgis);
+                if (item) {
+                    state.geoLayersMap[f.properties.key_qgis] = layer; 
+                    layer.bindPopup(`
+                        <div class="custom-tooltip">
+                            <div class="tooltip-header"><span>${normalizeCity(item.municipio)}</span> | <span>${item.zona || ''}</span></div>
+                            <div class="tooltip-main-item">${item.item || 'Item'}</div>
+                            <div class="tooltip-desc">${item.descricao || ''}</div>
+                            <div class="tooltip-item-box"><div class="tooltip-label-mini">CAPEX</div><div class="tooltip-highlight">${formatBRL(item.capex)}</div></div>
+                            <div class="tooltip-row-inline">
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">${getDimLabel(item.item)}</div><div>${item.dn_cv_m3 || '-'}</div></div>
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">QNTD</div><div>${formatNum(item.quantidade)}</div></div>
+                                <div class="tooltip-item-box"><div class="tooltip-label-mini">PU</div><div>${formatBRL(item.pu)}</div></div>
+                            </div>
+                        </div>
+                    `);
+                }
+            }
+        }).addTo(state.layers.itens);
+
+        const bounds = L.latLngBounds();
+        let hasGeom = false;
+        [state.layers.ainf, state.layers.itens].forEach(g => g.eachLayer(l => {
+            if (l.getBounds) { bounds.extend(l.getBounds()); hasGeom = true; }
+            else if (l.getLatLng) { bounds.extend(l.getLatLng()); hasGeom = true; }
+        }));
+        if (hasGeom && bounds.isValid()) state.map.flyToBounds(bounds, { padding: [30, 30], duration: 1.5 });
+    }
+
+    document.getElementById('filter-cidade').addEventListener('change', () => { updateObraFilter(); updateDashboard(); });
+    document.getElementById('filter-obra').addEventListener('change', () => updateDashboard());
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        document.getElementById('filter-cidade').value = ''; updateObraFilter();
+        document.getElementById('filter-obra').value = ''; updateDashboard();
+    });
+
+    window.onload = () => { initMap(); document.getElementById('loading').style.display = 'none'; };
+</script>
 </body>
 </html>
